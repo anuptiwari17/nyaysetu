@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import Navbar from "@/components/Navbar";
+import { useUser } from "@/lib/useUser";
 
 export default function PetitionsPage() {
+  const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [petitions, setPetitions] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  const dashboardHref = user?.role === "authority" ? "/dashboard/authority" : "/dashboard/citizen";
 
   useEffect(() => {
     let isActive = true;
@@ -86,11 +89,22 @@ export default function PetitionsPage() {
       <Navbar />
 
       <main className="mx-auto max-w-[1100px] px-6 pb-10 pt-20">
-        <h1 className="text-[26px] font-medium" style={{ color: "#1C2B2B" }}>
-          Public Petitions
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-[26px] font-medium" style={{ color: "#1C2B2B" }}>
+            Public Petitions
+          </h1>
+          {user ? (
+            <Link
+              href={dashboardHref}
+              className="inline-flex items-center justify-center rounded-[10px] px-4 py-2 text-[13px] font-medium no-underline"
+              style={{ border: "1.5px solid #3A7D7B", color: "#3A7D7B", background: "transparent" }}
+            >
+              Back to Dashboard
+            </Link>
+          ) : null}
+        </div>
         <p className="mt-1 text-[14px]" style={{ color: "#8A9BA8" }}>
-          Browse, support, and track civic petitions.
+          Browse, sign, and track civic petitions.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-3">

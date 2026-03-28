@@ -9,6 +9,9 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, mutate } = useUser();
+  const dashboardHref =
+    user?.role === "authority" ? "/dashboard/authority" : "/dashboard/citizen";
+  const isOnDashboard = pathname.startsWith("/dashboard");
 
   async function handleLogout() {
     try {
@@ -46,7 +49,10 @@ export default function Navbar() {
 
         <div className="hidden items-center gap-8 md:flex">
           {navLinks.map((link) => {
-            const isActive = pathname === link.href;
+            const isActive =
+              link.href === "/"
+                ? pathname === "/"
+                : pathname === link.href || pathname.startsWith(`${link.href}/`);
 
             return (
               <Link
@@ -63,6 +69,20 @@ export default function Navbar() {
               </Link>
             );
           })}
+
+          {!isLoading && user && !isOnDashboard ? (
+            <Link
+              href={dashboardHref}
+              className="no-underline transition-colors hover:text-[#3A7D7B]"
+              style={{
+                fontSize: "14px",
+                color: "#4A6060",
+                fontWeight: 400,
+              }}
+            >
+              Dashboard
+            </Link>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3">
@@ -87,6 +107,24 @@ export default function Navbar() {
 
           {!isLoading && user ? (
             <>
+              {!isOnDashboard ? (
+                <Link
+                  href={dashboardHref}
+                  className="hidden md:inline-flex items-center justify-center"
+                  style={{
+                    border: "1.5px solid #3A7D7B",
+                    color: "#3A7D7B",
+                    background: "transparent",
+                    borderRadius: "10px",
+                    padding: "7px 14px",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    lineHeight: 1,
+                  }}
+                >
+                  Dashboard
+                </Link>
+              ) : null}
               <span className="hidden md:inline-block" style={{ color: "#4A6060", fontSize: "13px" }}>
                 {user.name}
               </span>

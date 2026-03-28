@@ -26,15 +26,41 @@ export async function GET(request) {
   try {
     await db();
 
+    const authUser = await getAuthUserFromRequest(request);
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const params = request.nextUrl.searchParams;
     const city = params.get("city");
     const category = params.get("category");
     const status = params.get("status");
-    const createdBy = params.get("createdBy");
-    const assignedAuthority = params.get("assignedAuthority");
-    const authorityId = params.get("authorityId");
 
     const query = {};
+
+    if (authUser.role === "citizen") {
+      query.createdBy = authUser._id;
+    } else if (authUser.role === "authority") {
+      if (!authUser.authorityId) {
+        return NextResponse.json(
+          {
+            success: true,
+            grievances: [],
+            total: 0,
+          },
+          { status: 200 }
+        );
+      }
+      query.assignedAuthority = authUser.authorityId;
+    } else {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
     if (city) {
       query.city = city;
@@ -49,38 +75,6 @@ export async function GET(request) {
         query.status = "reported";
       } else {
         query.status = status;
-      }
-    }
-
-    if (createdBy === "me" || assignedAuthority === "me") {
-      const authUser = await getAuthUserFromRequest(request);
-      if (!authUser) {
-        return NextResponse.json(
-          { success: false, message: "Unauthorized" },
-          { status: 401 }
-        );
-      }
-
-      if (createdBy === "me") {
-        query.createdBy = authUser._id;
-      }
-
-      if (assignedAuthority === "me") {
-        if (authorityId) {
-          query.assignedAuthority = authorityId;
-        } else if (authUser.authorityId) {
-          query.assignedAuthority = authUser.authorityId;
-        } else {
-          query.assignedAuthority = null;
-        }
-      }
-    } else {
-      if (createdBy) {
-        query.createdBy = createdBy;
-      }
-
-      if (assignedAuthority) {
-        query.assignedAuthority = assignedAuthority;
       }
     }
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import db from "@/lib/db";
 import Grievance from "@/models/Grievance";
+import Petition from "@/models/Petition";
 import User from "@/models/User";
 
 async function getAuthUserFromRequest(request) {
@@ -26,12 +27,33 @@ export async function GET(_request, { params }) {
     await db();
     const { id } = await Promise.resolve(params);
 
+    const authUser = await getAuthUserFromRequest(_request);
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const grievance = await Grievance.findById(id)
       .populate({ path: "createdBy", select: "name" })
       .populate({ path: "assignedAuthority", select: "name city" })
       .populate({ path: "petitionId", select: "title signatures createdAt" });
 
     if (!grievance) {
+      return NextResponse.json(
+        { success: false, message: "Grievance not found" },
+        { status: 404 }
+      );
+    }
+
+    const isOwner = String(grievance.createdBy?._id || grievance.createdBy) === String(authUser._id);
+    const isAssignedAuthority =
+      authUser.role === "authority" &&
+      authUser.authorityId &&
+      String(grievance.assignedAuthority?._id || grievance.assignedAuthority) === String(authUser.authorityId);
+
+    if (!isOwner && !isAssignedAuthority) {
       return NextResponse.json(
         { success: false, message: "Grievance not found" },
         { status: 404 }
@@ -84,6 +106,16 @@ export async function PATCH(request, { params }) {
       );
     }
 
+    if (
+      !authUser.authorityId ||
+      String(grievance.assignedAuthority || "") !== String(authUser.authorityId)
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Only the assigned authority can update this grievance" },
+        { status: 403 }
+      );
+    }
+
     const userId = authUser._id;
 
     grievance.status = newStatus;
@@ -108,6 +140,57 @@ export async function PATCH(request, { params }) {
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error.message || "Failed to update grievance" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request, { params }) {
+  try {
+    await db();
+    const { id } = await Promise.resolve(params);
+
+    const authUser = await getAuthUserFromRequest(request);
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const grievance = await Grievance.findById(id);
+    if (!grievance) {
+      return NextResponse.json(
+        { success: false, message: "Grievance not found" },
+        { status: 404 }
+      );
+    }
+
+    if (String(grievance.createdBy || "") !== String(authUser._id)) {
+      return NextResponse.json(
+        { success: false, message: "Only the grievance creator can delete this grievance" },
+        { status: 403 }
+      );
+    }
+
+    if (grievance.petitionId) {
+      const petition = await Petition.findById(grievance.petitionId);
+      if (petition) {
+        petition.issueId = null;
+        petition.type = "independent";
+        await petition.save();
+      }
+    }
+
+    await Grievance.deleteOne({ _id: grievance._id });
+
+    return NextResponse.json(
+      { success: true, message: "Grievance deleted" },
+      { status: 200 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, message: error.message || "Failed to delete grievance" },
       { status: 500 }
     );
   }

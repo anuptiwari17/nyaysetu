@@ -11,6 +11,7 @@ export default function PetitionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isLoading: userLoading } = useUser();
+  const dashboardHref = user?.role === "authority" ? "/dashboard/authority" : "/dashboard/citizen";
 
   const petitionId = params?.id;
 
@@ -142,8 +143,8 @@ export default function PetitionDetailPage() {
       <div className="min-h-screen" style={{ background: "#F5F8F8" }}>
         <Navbar />
         <main className="mx-auto max-w-[700px] px-5 pt-24">
-          <Link href="/grievances" className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
-            ← All Issues
+          <Link href="/petition" className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
+            ← All Petitions
           </Link>
           <div className="mt-4 rounded-[14px] bg-white px-6 py-10 text-center" style={{ border: "0.5px solid #E4E8EA" }}>
             <p className="text-[16px] font-medium" style={{ color: "#1C2B2B" }}>
@@ -170,9 +171,17 @@ export default function PetitionDetailPage() {
       <Navbar />
 
       <main className="mx-auto max-w-[700px] px-5 pb-10 pt-24">
-        <Link href="/grievances" className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
-          ← All Issues
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={dashboardHref} className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
+            ← Dashboard
+          </Link>
+          <span className="text-[12px]" style={{ color: "#B0BEC5" }}>
+            |
+          </span>
+          <Link href="/petition" className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
+            All Petitions
+          </Link>
+        </div>
 
         <article className="mt-4 rounded-[14px] bg-white px-8 py-7" style={{ border: "0.5px solid #E4E8EA" }}>
           <span

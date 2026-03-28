@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -12,6 +13,7 @@ export default function NewPetitionPage() {
   const { user, isLoading } = useUser();
 
   const grievanceId = searchParams.get("grievanceId") || "";
+  const dashboardHref = user?.role === "authority" ? "/dashboard/authority" : "/dashboard/citizen";
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -159,6 +161,18 @@ export default function NewPetitionPage() {
       <Navbar />
 
       <main className="mx-auto max-w-[700px] px-5 pb-10 pt-24">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <Link href={dashboardHref} className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
+            ← Dashboard
+          </Link>
+          <span className="text-[12px]" style={{ color: "#B0BEC5" }}>
+            |
+          </span>
+          <Link href="/petition" className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
+            All Petitions
+          </Link>
+        </div>
+
         <h1 className="text-[26px] font-medium" style={{ color: "#1C2B2B" }}>
           Start a Petition
         </h1>

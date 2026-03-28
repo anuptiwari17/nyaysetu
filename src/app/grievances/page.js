@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MapPin, ThumbsUp } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import Navbar from "@/components/Navbar";
@@ -20,22 +20,31 @@ const CATEGORY_OPTIONS = [
 
 export default function GrievancesFeedPage() {
   const router = useRouter();
-  const { user } = useUser();
+  const { user, isLoading: userLoading } = useUser();
 
   const [loading, setLoading] = useState(true);
   const [issues, setIssues] = useState([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
-  const [sortBy, setSortBy] = useState("Most Supported");
+  const [sortBy, setSortBy] = useState("Newest");
 
   useEffect(() => {
+    if (!userLoading && !user) {
+      router.push("/login");
+      return;
+    }
+
+    if (!user) {
+      return;
+    }
+
     let isActive = true;
 
     async function fetchIssues() {
       setLoading(true);
 
       try {
-        const response = await fetch("/api/grievances?city=Jalandhar");
+        const response = await fetch("/api/grievances");
         const json = await response.json().catch(() => ({}));
 
         if (!isActive) {
@@ -69,7 +78,7 @@ export default function GrievancesFeedPage() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [user, userLoading, router]);
 
   const stats = useMemo(() => {
     return {
@@ -104,9 +113,7 @@ export default function GrievancesFeedPage() {
       });
     }
 
-    if (sortBy === "Most Supported") {
-      list.sort((a, b) => Number(b?.supportCount || 0) - Number(a?.supportCount || 0));
-    } else if (sortBy === "Newest") {
+    if (sortBy === "Newest") {
       list.sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime());
     } else {
       list.sort((a, b) => new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime());
@@ -148,16 +155,42 @@ export default function GrievancesFeedPage() {
     return `${days}d ago`;
   }
 
+  if (userLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: "#F5F8F8" }}>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const pageTitle = user?.role === "authority" ? "Assigned Grievances" : "My Grievances";
+  const pageSubtitle =
+    user?.role === "authority"
+      ? `${stats.totalCount} grievances assigned to your department`
+      : `${stats.totalCount} grievances reported · ${stats.resolvedCount} resolved`;
+  const dashboardHref = user?.role === "authority" ? "/dashboard/authority" : "/dashboard/citizen";
+
   return (
     <div className="min-h-screen" style={{ background: "#F5F8F8" }}>
       <Navbar />
 
       <main className="px-10 pb-10 pt-20">
-        <h1 className="text-[26px] font-medium" style={{ color: "#1C2B2B" }}>
-          Issues in Jalandhar
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-[26px] font-medium" style={{ color: "#1C2B2B" }}>{pageTitle}</h1>
+          <Link
+            href={dashboardHref}
+            className="inline-flex items-center justify-center rounded-[10px] px-4 py-2 text-[13px] font-medium no-underline"
+            style={{ border: "1.5px solid #3A7D7B", color: "#3A7D7B", background: "transparent" }}
+          >
+            Back to Dashboard
+          </Link>
+        </div>
         <p className="mt-1 text-[14px]" style={{ color: "#8A9BA8" }}>
-          {stats.totalCount} issues reported · {stats.resolvedCount} resolved
+          {pageSubtitle}
         </p>
 
         <div className="mt-5 flex flex-wrap gap-3">
@@ -191,7 +224,6 @@ export default function GrievancesFeedPage() {
             className="w-[160px] rounded-[10px] px-4 py-2.5 text-[14px] focus:outline-none"
             style={{ border: "0.5px solid #E4E8EA", background: "#FFFFFF" }}
           >
-            <option>Most Supported</option>
             <option>Newest</option>
             <option>Oldest</option>
           </select>
@@ -300,11 +332,6 @@ export default function GrievancesFeedPage() {
                   className="mt-3 flex items-center justify-between border-t pt-3"
                   style={{ borderTop: "0.5px solid #E4E8EA" }}
                 >
-                  <span className="inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#3A7D7B" }}>
-                    <ThumbsUp size={13} />
-                    {issue?.supportCount || 0}
-                  </span>
-
                   <span className="text-[11px] font-mono" style={{ color: "#B0BEC5" }}>
                     {getRelativeTime(issue?.createdAt)}
                   </span>
@@ -324,15 +351,13 @@ export default function GrievancesFeedPage() {
         </section>
       </main>
 
-      {user ? (
-        <Link
-          href="/grievances/new"
-          className="fixed bottom-6 right-6 z-50 inline-flex items-center justify-center rounded-[10px] px-5 py-3 text-[14px] font-medium text-white no-underline"
-          style={{ background: "#3A7D7B", boxShadow: "none" }}
-        >
-          Report Issue
-        </Link>
-      ) : null}
+      <Link
+        href="/grievances/new"
+        className="fixed bottom-6 right-6 z-50 inline-flex items-center justify-center rounded-[10px] px-5 py-3 text-[14px] font-medium text-white no-underline"
+        style={{ background: "#3A7D7B", boxShadow: "none" }}
+      >
+        Report Issue
+      </Link>
     </div>
   );
 }

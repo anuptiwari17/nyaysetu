@@ -10,7 +10,6 @@ import {
   Clock,
   MapPin,
   Sparkles,
-  ThumbsUp,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -25,15 +24,14 @@ export default function GrievanceDetailPage() {
   const grievanceId = params?.id;
 
   const [loading, setLoading] = useState(true);
-  const [supportLoading, setSupportLoading] = useState(false);
   const [grievance, setGrievance] = useState(null);
-  const [hasSupported, setHasSupported] = useState(false);
   const [showCiteModal, setShowCiteModal] = useState(false);
   const [citeSearch, setCiteSearch] = useState("");
   const [citeLoading, setCiteLoading] = useState(false);
   const [citeSubmittingId, setCiteSubmittingId] = useState("");
   const [citeError, setCiteError] = useState("");
   const [citeCandidates, setCiteCandidates] = useState([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (!grievanceId) {
@@ -55,17 +53,6 @@ export default function GrievanceDetailPage() {
 
         const issue = json?.grievance || json?.data || null;
         setGrievance(issue);
-
-        const userId = String(user?._id || user?.id || "");
-        const fromApiFlag = issue?.hasSupported === true || issue?.isSupported === true;
-        const fromSupporters = Array.isArray(issue?.supporters)
-          ? issue.supporters.some((item) => {
-              const id = typeof item === "string" ? item : item?._id || item?.id;
-              return String(id || "") === userId;
-            })
-          : false;
-
-        setHasSupported(Boolean(fromApiFlag || fromSupporters));
       } catch (_error) {
         if (!isActive) {
           return;
@@ -86,7 +73,7 @@ export default function GrievanceDetailPage() {
     return () => {
       isActive = false;
     };
-  }, [grievanceId, user?._id, user?.id]);
+  }, [grievanceId]);
 
   const statusHistory = useMemo(() => {
     if (!grievance) {
@@ -122,6 +109,7 @@ export default function GrievanceDetailPage() {
   const currentUserId = String(user?._id || user?.id || "");
   const canCitePetition = Boolean(currentUserId && grievanceCreatorId && currentUserId === grievanceCreatorId);
   const canEscalatePetition = canCitePetition;
+  const dashboardHref = user?.role === "authority" ? "/dashboard/authority" : "/dashboard/citizen";
 
   function statusBadgeStyle(status) {
     if (status === "resolved") {
@@ -139,46 +127,27 @@ export default function GrievanceDetailPage() {
     return String(status || "reported").replace("_", " ");
   }
 
-  async function handleSupport() {
-    if (!userLoading && !user) {
-      router.push("/login");
+  async function handleDeleteGrievance() {
+    if (!grievanceId || deleteLoading) {
       return;
     }
 
-    if (!grievanceId || hasSupported) {
-      return;
-    }
-
-    setSupportLoading(true);
+    setDeleteLoading(true);
 
     try {
-      const response = await fetch(`/api/grievances/${grievanceId}/support`, {
-        method: "POST",
+      const response = await fetch(`/api/grievances/${grievanceId}`, {
+        method: "DELETE",
       });
-
-      const json = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(json?.message || "Failed to support issue");
+        throw new Error("Unable to delete grievance");
       }
 
-      setHasSupported(true);
-      setGrievance((previous) => {
-        if (!previous) {
-          return previous;
-        }
-
-        return {
-          ...previous,
-          supportCount: Number(previous.supportCount || 0) + 1,
-        };
-      });
+      router.push("/dashboard/citizen/my-issues");
     } catch (_error) {
-      if (!user) {
-        router.push("/login");
-      }
+      return;
     } finally {
-      setSupportLoading(false);
+      setDeleteLoading(false);
     }
   }
 
@@ -294,9 +263,17 @@ export default function GrievanceDetailPage() {
       <Navbar />
 
       <main className="mx-auto max-w-[1200px] px-10 pb-10 pt-20">
-        <Link href="/grievances" className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
-          ← All Issues
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={dashboardHref} className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
+            ← Dashboard
+          </Link>
+          <span className="text-[12px]" style={{ color: "#B0BEC5" }}>
+            |
+          </span>
+          <Link href="/grievances" className="text-[14px] no-underline" style={{ color: "#3A7D7B" }}>
+            My Grievances
+          </Link>
+        </div>
 
         <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
           <section>
@@ -319,14 +296,6 @@ export default function GrievanceDetailPage() {
                   {prettyStatus(grievance?.status)}
                 </span>
 
-                {Number(grievance?.supportCount || 0) > 100 ? (
-                  <span
-                    className="rounded-[20px] px-[10px] py-[2px] text-[11px] font-medium"
-                    style={{ background: "#FEF3C7", color: "#B45309" }}
-                  >
-                    Trending 🔥
-                  </span>
-                ) : null}
               </div>
 
               <h1 className="mt-3 text-[24px] font-medium leading-[1.3]" style={{ color: "#1C2B2B" }}>
@@ -345,10 +314,6 @@ export default function GrievanceDetailPage() {
                 <span className="inline-flex items-center gap-1.5">
                   <Building2 size={14} />
                   {grievance?.assignedAuthority?.name || grievance?.authorityName || "Not assigned"}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <ThumbsUp size={14} />
-                  {grievance?.supportCount || 0}
                 </span>
               </div>
 
@@ -464,30 +429,12 @@ export default function GrievanceDetailPage() {
               className="rounded-[14px] bg-white px-5 py-5"
               style={{ border: "0.5px solid #E4E8EA" }}
             >
-              <p className="text-[36px] font-medium leading-none" style={{ color: "#3A7D7B" }}>
-                {grievance?.supportCount || 0}
+              <p className="text-[16px] font-medium" style={{ color: "#1C2B2B" }}>
+                Private Grievance
               </p>
               <p className="mt-1 text-[13px]" style={{ color: "#8A9BA8" }}>
-                people support this
+                Visible only to owner and assigned authority.
               </p>
-
-              <button
-                type="button"
-                onClick={handleSupport}
-                disabled={supportLoading || hasSupported}
-                className="mt-4 inline-flex w-full items-center justify-center rounded-[10px] px-4 py-3 text-[15px] font-medium"
-                style={
-                  hasSupported
-                    ? { background: "#EAF4F4", color: "#3A7D7B" }
-                    : { background: "#3A7D7B", color: "#FFFFFF" }
-                }
-              >
-                {supportLoading
-                  ? "Supporting..."
-                  : hasSupported
-                    ? "Supported ✓"
-                    : "Support this Issue"}
-              </button>
 
               <div className="my-4 h-px" style={{ background: "#E4E8EA" }} />
 
@@ -561,6 +508,18 @@ export default function GrievanceDetailPage() {
                 <p className="mt-2 text-[12px]" style={{ color: "#8A9BA8" }}>
                   Only the grievance creator can escalate it to a petition.
                 </p>
+              ) : null}
+
+              {canEscalatePetition ? (
+                <button
+                  type="button"
+                  onClick={handleDeleteGrievance}
+                  disabled={deleteLoading}
+                  className="mt-3 inline-flex w-full items-center justify-center rounded-[10px] px-4 py-2.5 text-[14px]"
+                  style={{ background: "#FEE2E2", color: "#B91C1C", border: "1px solid #FCA5A5" }}
+                >
+                  {deleteLoading ? "Deleting..." : "Delete Grievance"}
+                </button>
               ) : null}
             </div>
           </aside>

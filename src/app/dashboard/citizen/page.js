@@ -4,11 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle,
-  ChevronRight,
   FileText,
-  Inbox,
   ScrollText,
-  ThumbsUp,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -20,9 +18,11 @@ export default function CitizenDashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useUser();
   const [statsLoading, setStatsLoading] = useState(true);
-  const [issuesLoading, setIssuesLoading] = useState(true);
+  const [petitionsLoading, setPetitionsLoading] = useState(true);
   const [issues, setIssues] = useState([]);
-  const [petitions, setPetitions] = useState([]);
+  const [publicPetitions, setPublicPetitions] = useState([]);
+  const [signedPetitionIds, setSignedPetitionIds] = useState([]);
+  const [signingId, setSigningId] = useState("");
 
   const firstName = useMemo(() => {
     const value = String(user?.name || "").trim();
@@ -32,46 +32,15 @@ export default function CitizenDashboardPage() {
   const stats = useMemo(() => {
     const issuesReported = issues.length;
     const issuesResolved = issues.filter((item) => item?.status === "resolved").length;
-
-    const supportedFromFlag = issues.filter(
-      (item) => item?.supported === true || item?.isSupported === true
-    ).length;
-
-    const supportedFromSupporters = issues.filter((item) => {
-      if (!Array.isArray(item?.supporters)) {
-        return false;
-      }
-
-      return item.supporters.some((supporter) => {
-        const supportId =
-          typeof supporter === "string" ? supporter : supporter?._id || supporter?.id;
-        return String(supportId || "") === String(user?._id || user?.id || "");
-      });
-    }).length;
-
-    const supportedFromApi = Number.isFinite(Number(issues?.supportedCount))
-      ? Number(issues.supportedCount)
-      : 0;
-
-    const supportedIssues = Math.max(supportedFromFlag, supportedFromSupporters, supportedFromApi);
-
-    const petitionsSigned = Number.isFinite(Number(petitions?.signedCount))
-      ? Number(petitions.signedCount)
-      : petitions.length;
+    const petitionsSigned = signedPetitionIds.length;
 
     return {
       issuesReported,
-      supportedIssues,
       petitionsSigned,
       issuesResolved,
+      publicPetitions: publicPetitions.length,
     };
-  }, [issues, petitions, user?._id, user?.id]);
-
-  const recentIssues = useMemo(() => {
-    return [...issues]
-      .sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime())
-      .slice(0, 3);
-  }, [issues]);
+  }, [issues, signedPetitionIds, publicPetitions]);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "citizen")) {
@@ -88,16 +57,18 @@ export default function CitizenDashboardPage() {
 
     async function loadCitizenData() {
       setStatsLoading(true);
-      setIssuesLoading(true);
+      setPetitionsLoading(true);
 
       try {
-        const [grievancesRes, petitionsRes] = await Promise.all([
-          fetch("/api/grievances?createdBy=me"),
-          fetch("/api/petitions?signedBy=me"),
+        const [grievancesRes, signedRes, publicRes] = await Promise.all([
+          fetch("/api/grievances"),
+          fetch("/api/petitions?signedBy=me&limit=100"),
+          fetch("/api/petitions?limit=12"),
         ]);
 
         const grievancesJson = await grievancesRes.json().catch(() => ({}));
-        const petitionsJson = await petitionsRes.json().catch(() => ({}));
+        const signedJson = await signedRes.json().catch(() => ({}));
+        const publicJson = await publicRes.json().catch(() => ({}));
 
         if (!isActive) {
           return;
@@ -109,38 +80,40 @@ export default function CitizenDashboardPage() {
             ? grievancesJson.data
             : [];
 
-        const petitionsList = Array.isArray(petitionsJson?.petitions)
-          ? petitionsJson.petitions
-          : Array.isArray(petitionsJson?.data)
-            ? petitionsJson.data
+        const signedList = Array.isArray(signedJson?.petitions)
+          ? signedJson.petitions
+          : Array.isArray(signedJson?.data)
+            ? signedJson.data
             : [];
 
-        const issuesWithMeta = [...grievancesList];
-        if (Number.isFinite(Number(grievancesJson?.supportedCount))) {
-          issuesWithMeta.supportedCount = Number(grievancesJson.supportedCount);
-        }
+        const publicList = Array.isArray(publicJson?.petitions)
+          ? publicJson.petitions
+          : Array.isArray(publicJson?.data)
+            ? publicJson.data
+            : [];
 
-        const petitionsWithMeta = [...petitionsList];
-        if (Number.isFinite(Number(petitionsJson?.signedCount))) {
-          petitionsWithMeta.signedCount = Number(petitionsJson.signedCount);
-        }
+        const signedIds = signedList
+          .map((item) => String(item?._id || item?.id || ""))
+          .filter(Boolean);
 
-        setIssues(issuesWithMeta);
-        setPetitions(petitionsWithMeta);
+        setIssues(grievancesList);
+        setPublicPetitions(publicList);
+        setSignedPetitionIds(signedIds);
       } catch (_error) {
         if (!isActive) {
           return;
         }
 
         setIssues([]);
-        setPetitions([]);
+        setPublicPetitions([]);
+        setSignedPetitionIds([]);
       } finally {
         if (!isActive) {
           return;
         }
 
         setStatsLoading(false);
-        setIssuesLoading(false);
+        setPetitionsLoading(false);
       }
     }
 
@@ -150,6 +123,47 @@ export default function CitizenDashboardPage() {
       isActive = false;
     };
   }, [user]);
+
+  async function handleSignPetition(petitionId) {
+    const id = String(petitionId || "");
+    if (!id || signingId || signedPetitionIds.includes(id)) {
+      return;
+    }
+
+    setSigningId(id);
+
+    try {
+      const response = await fetch(`/api/petitions/${id}/sign`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to sign petition");
+      }
+
+      setSignedPetitionIds((previous) => Array.from(new Set([...previous, id])));
+      setPublicPetitions((previous) =>
+        previous.map((petition) => {
+          const petitionIdValue = String(petition?._id || petition?.id || "");
+          if (petitionIdValue !== id) {
+            return petition;
+          }
+
+          const signatures = Array.isArray(petition?.signatures) ? [...petition.signatures] : [];
+          signatures.push("signed");
+
+          return {
+            ...petition,
+            signatures,
+          };
+        })
+      );
+    } catch (_error) {
+      return;
+    } finally {
+      setSigningId("");
+    }
+  }
 
   function getStatusBadgeStyle(status) {
     if (status === "resolved") {
@@ -220,12 +234,12 @@ export default function CitizenDashboardPage() {
                       className="text-[12px] uppercase tracking-[0.08em]"
                       style={{ color: "#8A9BA8" }}
                     >
-                      Supported Issues
+                      Public Petitions
                     </p>
-                    <ThumbsUp size={20} style={{ color: "#3A7D7B" }} />
+                    <Users size={20} style={{ color: "#3A7D7B" }} />
                   </div>
                   <p className="mt-2 text-[28px] font-medium" style={{ color: "#1C2B2B" }}>
-                    {stats.supportedIssues}
+                    {stats.publicPetitions}
                   </p>
                 </div>
 
@@ -265,76 +279,86 @@ export default function CitizenDashboardPage() {
           <section className="mt-10">
             <div className="flex items-center justify-between">
               <h2 className="text-[18px] font-medium" style={{ color: "#1C2B2B" }}>
-                My recent issues
+                Public petitions to sign
               </h2>
-              <Link href="/dashboard/citizen/my-issues" className="text-[13px] no-underline" style={{ color: "#3A7D7B" }}>
+              <Link href="/petition" className="text-[13px] no-underline" style={{ color: "#3A7D7B" }}>
                 View all →
               </Link>
             </div>
 
             <div className="mt-4 space-y-3">
-              {issuesLoading ? (
+              {petitionsLoading ? (
                 <>
                   <div className="h-[74px] animate-pulse rounded-[12px] bg-gray-100" />
                   <div className="h-[74px] animate-pulse rounded-[12px] bg-gray-100" />
                   <div className="h-[74px] animate-pulse rounded-[12px] bg-gray-100" />
                 </>
-              ) : recentIssues.length === 0 ? (
+              ) : publicPetitions.length === 0 ? (
                 <div
                   className="flex flex-col items-center rounded-[12px] bg-white px-6 py-10 text-center"
                   style={{ border: "0.5px solid #E4E8EA" }}
                 >
-                  <Inbox size={48} style={{ color: "#B0BEC5" }} />
                   <p className="mt-3 text-[16px] font-medium" style={{ color: "#1C2B2B" }}>
-                    No issues reported yet
+                    No public petitions yet
                   </p>
                   <p className="mt-1 text-[13px]" style={{ color: "#8A9BA8" }}>
-                    Be the first to report a civic issue in your area
+                    Public petitions will appear here for community collaboration.
                   </p>
-                  <Link
-                    href="/grievances/new"
-                    className="mt-5 inline-flex items-center justify-center rounded-[10px] px-5 py-2.5 text-[14px] font-medium text-white no-underline"
-                    style={{ background: "#3A7D7B" }}
-                  >
-                    Report your first issue
-                  </Link>
                 </div>
               ) : (
-                recentIssues.map((issue) => (
+                publicPetitions.map((petition) => {
+                  const petitionId = String(petition?._id || petition?.id || "");
+                  const isSigned = signedPetitionIds.includes(petitionId);
+                  const signatureCount = Array.isArray(petition?.signatures)
+                    ? petition.signatures.length
+                    : Number(petition?.signatureCount || 0);
+
+                  return (
                   <div
-                    key={issue?._id || issue?.id || issue?.title}
+                    key={petitionId || petition?.title}
                     className="flex items-center rounded-[12px] bg-white px-[18px] py-[14px]"
                     style={{ border: "0.5px solid #E4E8EA" }}
                   >
                     <span
                       className="mr-4 inline-block rounded-[20px] px-[10px] py-[2px] text-[11px] font-medium uppercase"
-                      style={{ background: "#EAF4F4", color: "#3A7D7B" }}
+                      style={{ background: petition?.issueId ? "#EAF4F4" : "#EEF2F2", color: petition?.issueId ? "#3A7D7B" : "#8A9BA8" }}
                     >
-                      {issue?.category || "GENERAL"}
+                      {petition?.issueId ? "Linked" : "Public"}
                     </span>
 
                     <div className="flex-1">
                       <p className="text-[15px] font-medium" style={{ color: "#1C2B2B" }}>
-                        {issue?.title || "Untitled issue"}
+                        {petition?.title || "Untitled petition"}
+                      </p>
+                      <p className="text-[12px]" style={{ color: "#8A9BA8" }}>
+                        {signatureCount} signatures
                       </p>
                     </div>
 
-                    <span
-                      className="mr-3 rounded-[20px] px-[10px] py-[2px] text-[11px] font-medium"
-                      style={getStatusBadgeStyle(issue?.status)}
+                    <button
+                      type="button"
+                      onClick={() => handleSignPetition(petitionId)}
+                      disabled={isSigned || signingId === petitionId}
+                      className="mr-3 rounded-[8px] px-3 py-1.5 text-[12px]"
+                      style={
+                        isSigned
+                          ? { background: "#E8F5E9", color: "#2E7D32" }
+                          : { background: "#3A7D7B", color: "#FFFFFF" }
+                      }
                     >
-                      {String(issue?.status || "reported").replace("_", " ")}
-                    </span>
+                      {signingId === petitionId ? "Signing..." : isSigned ? "Signed ✓" : "Sign"}
+                    </button>
 
                     <Link
-                      href={`/grievances/${issue?._id || issue?.id || ""}`}
+                      href={`/petition/${petitionId}`}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full no-underline"
                       style={{ color: "#8A9BA8" }}
                     >
-                      <ChevronRight size={18} />
+                      →
                     </Link>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
           </section>

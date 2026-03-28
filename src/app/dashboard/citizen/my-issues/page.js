@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MapPin, ThumbsUp } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import CitizenSidebar from "@/components/CitizenSidebar";
@@ -15,6 +15,7 @@ export default function MyIssuesPage() {
   const [issues, setIssues] = useState([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [deletingId, setDeletingId] = useState("");
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "citizen")) {
@@ -123,6 +124,31 @@ export default function MyIssuesPage() {
     return { borderLeft: "3px solid #3A7D7B" };
   }
 
+  async function handleDelete(issueId) {
+    const id = String(issueId || "");
+    if (!id || deletingId) {
+      return;
+    }
+
+    setDeletingId(id);
+
+    try {
+      const response = await fetch(`/api/grievances/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to delete grievance");
+      }
+
+      setIssues((previous) => previous.filter((item) => String(item?._id || item?.id || "") !== id));
+    } catch (_error) {
+      return;
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   return (
     <div className="min-h-screen" style={{ background: "#F5F8F8" }}>
       <Navbar />
@@ -209,12 +235,7 @@ export default function MyIssuesPage() {
                     <span>{issue?.location || issue?.city || "Jalandhar"}</span>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-4">
-                    <div className="inline-flex items-center gap-1.5 text-[13px]" style={{ color: "#8A9BA8" }}>
-                      <ThumbsUp size={14} />
-                      <span>{issue?.supportCount || 0}</span>
-                    </div>
-
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
                     <span className="text-[12px] font-mono" style={{ color: "#B0BEC5" }}>
                       {new Date(issue?.createdAt || Date.now()).toLocaleDateString()}
                     </span>
@@ -226,6 +247,16 @@ export default function MyIssuesPage() {
                     >
                       View Details →
                     </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(issue?._id || issue?.id)}
+                      disabled={deletingId === String(issue?._id || issue?.id || "")}
+                      className="rounded-[8px] px-3 py-1 text-[12px]"
+                      style={{ background: "#FEE2E2", color: "#B91C1C" }}
+                    >
+                      {deletingId === String(issue?._id || issue?.id || "") ? "Deleting..." : "Delete"}
+                    </button>
                   </div>
                 </article>
               ))

@@ -8,10 +8,10 @@ export default function CitizenSidebar({ user }) {
   const pathname = usePathname();
 
   const sidebarLinks = [
-    { label: "Overview", href: "/dashboard/citizen" },
-    { label: "My Issues", href: "/dashboard/citizen/my-issues" },
+    { label: "Dashboard", href: "/dashboard/citizen" },
+    { label: "My Grievances", href: "/dashboard/citizen/my-issues" },
     { label: "My Petitions", href: "/dashboard/citizen/my-petitions" },
-    { label: "Browse Issues", href: "/grievances" },
+    { label: "Public Petitions", href: "/petition" },
   ];
 
   const initials = useMemo(() => {
@@ -52,7 +52,7 @@ export default function CitizenSidebar({ user }) {
 
         <nav className="mt-7 flex flex-col gap-1">
           {sidebarLinks.map((link) => {
-            const isActive = pathname === link.href;
+            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
                 key={link.href}
