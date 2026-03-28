@@ -11,7 +11,51 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+let firebaseApp = null;
+let firebaseAuth = null;
+let firebaseStorage = null;
 
-export const firebaseAuth = getAuth(app);
-export const firebaseStorage = getStorage(app);
+function hasFirebaseClientConfig() {
+  return Boolean(
+    firebaseConfig.apiKey &&
+      firebaseConfig.authDomain &&
+      firebaseConfig.projectId &&
+      firebaseConfig.storageBucket &&
+      firebaseConfig.messagingSenderId &&
+      firebaseConfig.appId
+  );
+}
+
+function ensureBrowserRuntime() {
+  if (typeof window === "undefined") {
+    throw new Error("Firebase client services are only available in the browser runtime.");
+  }
+}
+
+function getFirebaseApp() {
+  ensureBrowserRuntime();
+
+  if (!hasFirebaseClientConfig()) {
+    throw new Error("Firebase client environment variables are missing.");
+  }
+
+  if (!firebaseApp) {
+    firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  }
+
+  return firebaseApp;
+}
+
+export function getFirebaseAuth() {
+  if (!firebaseAuth) {
+    firebaseAuth = getAuth(getFirebaseApp());
+  }
+  return firebaseAuth;
+}
+
+export function getFirebaseStorage() {
+  if (!firebaseStorage) {
+    firebaseStorage = getStorage(getFirebaseApp());
+  }
+  return firebaseStorage;
+}

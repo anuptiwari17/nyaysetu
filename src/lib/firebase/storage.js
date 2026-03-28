@@ -1,6 +1,6 @@
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
-import { firebaseStorage } from "@/lib/firebase/client";
+import { getFirebaseStorage } from "@/lib/firebase/client";
 
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
 export const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -44,6 +44,7 @@ export async function uploadImageToFirebase(file, folder = "evidence") {
 
   const safeName = sanitizeFileName(file.name);
   const storagePath = `${folder}/${Date.now()}_${safeName}`;
+  const firebaseStorage = getFirebaseStorage();
   const storageRef = ref(firebaseStorage, storagePath);
 
   await uploadBytes(storageRef, file);

@@ -11,7 +11,7 @@ import {
   signInWithEmailLink,
 } from "firebase/auth";
 
-import { firebaseAuth } from "@/lib/firebase/client";
+import { getFirebaseAuth } from "@/lib/firebase/client";
 
 function normalizePhone(value) {
   return String(value || "")
@@ -25,6 +25,10 @@ function isValidEmail(value) {
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  function getAuthClient() {
+    return getFirebaseAuth();
+  }
 
   const [step, setStep] = useState(1);
   const [emailLinkSent, setEmailLinkSent] = useState(false);
@@ -71,6 +75,8 @@ export default function RegisterPage() {
 
     const completeEmailLinkSignIn = async () => {
       try {
+        const firebaseAuth = getAuthClient();
+
         if (!isSignInWithEmailLink(firebaseAuth, window.location.href)) {
           return;
         }
@@ -118,6 +124,7 @@ export default function RegisterPage() {
         handleCodeInApp: true,
       };
 
+      const firebaseAuth = getAuthClient();
       await sendSignInLinkToEmail(firebaseAuth, email, actionCodeSettings);
       window.localStorage.setItem("nyaysetuEmailForSignIn", email);
       setEmailLinkSent(true);
@@ -143,6 +150,7 @@ export default function RegisterPage() {
       window.recaptchaVerifier = null;
     }
 
+    const firebaseAuth = getAuthClient();
     const verifier = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", {
       size: "invisible",
       callback: () => {},
@@ -170,6 +178,7 @@ export default function RegisterPage() {
     setFirebasePhoneToken("");
 
     try {
+      const firebaseAuth = getAuthClient();
       firebaseAuth.languageCode = "en";
       const appVerifier = await initializeRecaptcha();
       const confirmation = await signInWithPhoneNumber(
