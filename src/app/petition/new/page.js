@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Sparkles, WandSparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import Navbar from "@/components/Navbar";
@@ -20,6 +21,12 @@ export default function NewPetitionPage() {
   const [linkedIssue, setLinkedIssue] = useState(null);
   const [issueLoading, setIssueLoading] = useState(false);
   const [ownerError, setOwnerError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+
+  const [assistantPrompt, setAssistantPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiResult, setAiResult] = useState(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -76,6 +83,7 @@ export default function NewPetitionPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!canEscalateThisIssue) { setOwnerError("Only the grievance creator can escalate it to a petition."); return; }
+    setSubmitError("");
     setSubmitting(true);
     try {
       const res = await fetch("/api/petitions", {
@@ -92,9 +100,53 @@ export default function NewPetitionPage() {
       if (!res.ok) throw new Error(json?.message || "Unable to create petition");
       const newId = json?.petition?._id || json?.petition?.id || json?.id || json?.data?._id || json?.data?.id;
       router.push(newId ? `/petition/${newId}` : "/petition");
-    } catch {
+    } catch (error) {
+      setSubmitError(error.message || "Unable to create petition");
       setSubmitting(false);
     }
+  }
+
+  async function handleGenerateDraft(mode = "generate") {
+    setAiLoading(true);
+    setAiError("");
+
+    try {
+      const res = await fetch("/api/ai/petition-assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          assistantPrompt,
+          currentTitle: title,
+          currentDescription: description,
+          linkedIssueTitle: linkedIssue?.title || "",
+          linkedIssueDescription: linkedIssue?.description || "",
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.message || "Unable to generate draft");
+      }
+
+      const result = json?.result || null;
+      if (!result?.title || !result?.description) {
+        throw new Error("AI generated an incomplete draft. Try once more.");
+      }
+
+      setAiResult(result);
+    } catch (error) {
+      setAiError(error.message || "AI is unavailable right now. Please try again.");
+      setAiResult(null);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function applyAiDraft() {
+    if (!aiResult) return;
+    setTitle(aiResult.title || "");
+    setDescription(aiResult.description || "");
   }
 
   if (isLoading) {
@@ -167,6 +219,161 @@ export default function NewPetitionPage() {
           </div>
         )}
 
+        {/* AI helper */}
+        <section
+          style={{
+            background: "#FFFFFF",
+            borderRadius: "16px",
+            padding: "20px",
+            border: "1px solid #C7D2F0",
+            marginBottom: "16px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+            <Sparkles size={16} color="#4A6FA9" />
+            <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "#0D1B2A" }}>
+              AI Petition Assistant
+            </h2>
+          </div>
+          <p style={{ margin: "0 0 12px", fontSize: "13px", color: "#666666" }}>
+            Stuck with wording? Describe the issue in simple language and get a clear draft instantly.
+          </p>
+
+          <textarea
+            value={assistantPrompt}
+            onChange={(e) => setAssistantPrompt(e.target.value)}
+            placeholder="Example: Street lights in Model Town have not worked for 2 months. Women and students feel unsafe at night. Ask municipal authority for repair timeline and weekly progress updates."
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              borderRadius: "10px",
+              padding: "11px 14px",
+              fontSize: "14px",
+              border: "1px solid #E8E1D5",
+              background: "#F8FAFC",
+              color: "#171717",
+              outline: "none",
+              fontFamily: "inherit",
+              minHeight: "110px",
+              resize: "vertical",
+              lineHeight: 1.55,
+            }}
+          />
+
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
+            <button
+              type="button"
+              onClick={() => handleGenerateDraft("generate")}
+              disabled={aiLoading || assistantPrompt.trim().length < 15}
+              style={{
+                borderRadius: "9px",
+                padding: "9px 14px",
+                fontSize: "13px",
+                fontWeight: 700,
+                border: "none",
+                color: "#FFFFFF",
+                background: aiLoading || assistantPrompt.trim().length < 15 ? "#9CA3AF" : "#4A6FA9",
+                cursor: aiLoading || assistantPrompt.trim().length < 15 ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <WandSparkles size={14} />
+              {aiLoading ? "Generating..." : "Generate Draft"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleGenerateDraft("improve")}
+              disabled={aiLoading || assistantPrompt.trim().length < 15 || (!title.trim() && !description.trim())}
+              style={{
+                borderRadius: "9px",
+                padding: "9px 14px",
+                fontSize: "13px",
+                fontWeight: 700,
+                border: "1px solid #4A6FA9",
+                color: "#4A6FA9",
+                background: "#FFFFFF",
+                cursor:
+                  aiLoading || assistantPrompt.trim().length < 15 || (!title.trim() && !description.trim())
+                    ? "not-allowed"
+                    : "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Improve Current Draft
+            </button>
+          </div>
+
+          {aiError && (
+            <p style={{ margin: "10px 0 0", fontSize: "13px", color: "#B91C1C" }}>
+              {aiError}
+            </p>
+          )}
+
+          {aiResult && (
+            <div
+              style={{
+                marginTop: "12px",
+                borderRadius: "10px",
+                background: "#EEF2FF",
+                border: "1px solid #C7D2F0",
+                padding: "12px",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#4A6FA9" }}>
+                AI Draft Preview
+              </p>
+              <p style={{ margin: "5px 0 0", fontSize: "14px", fontWeight: 700, color: "#0D1B2A" }}>
+                {aiResult.title}
+              </p>
+              <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#555555", whiteSpace: "pre-line", lineHeight: 1.6 }}>
+                {aiResult.description}
+              </p>
+              {Array.isArray(aiResult.keyPoints) && aiResult.keyPoints.length > 0 && (
+                <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {aiResult.keyPoints.map((point) => (
+                    <span
+                      key={point}
+                      style={{
+                        fontSize: "12px",
+                        padding: "4px 8px",
+                        borderRadius: "999px",
+                        background: "#FFFFFF",
+                        border: "1px solid #D5DEFA",
+                        color: "#4A6FA9",
+                      }}
+                    >
+                      {point}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={applyAiDraft}
+                  style={{
+                    borderRadius: "8px",
+                    padding: "8px 12px",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    border: "none",
+                    color: "#FFFFFF",
+                    background: "#4A6FA9",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Use This Draft
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* Form */}
         <form
           onSubmit={handleSubmit}
@@ -223,6 +430,10 @@ export default function NewPetitionPage() {
           </div>
 
           {/* Submit */}
+          {submitError && (
+            <p style={{ margin: 0, fontSize: "13px", color: "#B91C1C" }}>{submitError}</p>
+          )}
+
           <button
             type="submit"
             disabled={submitting || !canEscalateThisIssue}

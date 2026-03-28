@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Clock, Inbox, MapPin, ThumbsUp, LayoutDashboard, FileText, Scale, LogOut } from "lucide-react";
+import { CheckCircle, Clock, Inbox, MapPin, ThumbsUp, LayoutDashboard, FileText, Scale, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import Navbar from "@/components/Navbar";
@@ -10,7 +10,7 @@ import { useUser } from "@/lib/useUser";
 
 export default function AuthorityDashboardPage() {
   const router = useRouter();
-  const { user, isLoading, mutate } = useUser();
+  const { user, isLoading } = useUser();
   const [issuesLoading, setIssuesLoading] = useState(true);
   const [issues, setIssues] = useState([]);
   const [sortBy, setSortBy] = useState("supported");
@@ -98,17 +98,6 @@ export default function AuthorityDashboardPage() {
     fetchAssignedIssues();
     return () => { isActive = false; };
   }, [user]);
-
-  async function handleLogout() {
-    try {
-      await fetch("/api/auth/logout", { method: "GET" });
-      router.push("/");
-      await mutate();
-    } catch (_error) {
-      router.push("/");
-      await mutate();
-    }
-  }
 
   function getPriorityStyle(supportCount) {
     const count = Number(supportCount || 0);
@@ -227,29 +216,6 @@ export default function AuthorityDashboardPage() {
             </nav>
           </div>
 
-          {/* Logout */}
-          <button
-            type="button"
-            onClick={handleLogout}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              width: "100%",
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #EDE8DF",
-              background: "#FFFFFF",
-              color: "#78716C",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            <LogOut size={15} />
-            Logout
-          </button>
         </aside>
 
         {/* ── Main Content ── */}
@@ -265,27 +231,6 @@ export default function AuthorityDashboardPage() {
                 {departmentName}
               </h1>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "9px 18px",
-                borderRadius: 50,
-                border: "1px solid #EDE8DF",
-                background: "#FFFFFF",
-                color: "#78716C",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              <LogOut size={14} />
-              Logout
-            </button>
           </div>
 
           {/* Stat cards */}
@@ -423,6 +368,9 @@ export default function AuthorityDashboardPage() {
                 sortedAndFilteredIssues.map((issue) => {
                   const priority = getPriorityStyle(issue?.supportCount);
                   const statusStyle = getStatusStyle(issue?.status);
+                  const reporterName = issue?.isAnonymous || issue?.anonymous
+                    ? "Anonymous citizen"
+                    : issue?.createdBy?.name || "Unknown citizen";
 
                   return (
                     <article
@@ -477,6 +425,10 @@ export default function AuthorityDashboardPage() {
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#A8A29E" }}>
                           <Clock size={13} />
                           {getRelativeTime(issue?.createdAt)}
+                        </span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#A8A29E" }}>
+                          <User size={13} />
+                          {reporterName}
                         </span>
 
                         <Link

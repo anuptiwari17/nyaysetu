@@ -29,6 +29,7 @@ const GrievanceSchema = new Schema({
       {
         status: { type: String, trim: true },
         note: { type: String, default: "", trim: true },
+        proof: { type: String, default: "", trim: true },
         updatedAt: { type: Date, default: Date.now },
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       },

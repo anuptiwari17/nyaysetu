@@ -8,6 +8,11 @@ import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 import Navbar from "@/components/Navbar";
+import {
+  MAX_EVIDENCE_FILES,
+  assertValidImageFiles,
+  uploadImageToFirebase,
+} from "@/lib/firebase/storage";
 import { useUser } from "@/lib/useUser";
 
 const CATEGORIES = [
@@ -83,10 +88,29 @@ export default function NewGrievancePage() {
     }
   }
 
+  function handleEvidenceSelection(event) {
+    const selectedFiles = Array.from(event.target.files || []);
+
+    try {
+      assertValidImageFiles(selectedFiles, MAX_EVIDENCE_FILES);
+      setFiles(selectedFiles);
+    } catch (fileError) {
+      toast.error(fileError.message || "Invalid file selection");
+      setFiles([]);
+      event.target.value = "";
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     try {
+      assertValidImageFiles(files, MAX_EVIDENCE_FILES);
+
+      const evidenceUrls = files.length
+        ? await Promise.all(files.map((file) => uploadImageToFirebase(file, "grievances/evidence")))
+        : [];
+
       const res = await fetch("/api/grievances", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,7 +121,7 @@ export default function NewGrievancePage() {
           location,
           description,
           anonymous,
-          evidence: files.map((f) => f.name),
+          evidence: evidenceUrls,
           suggestedCategory: aiResult?.suggestedCategory || "",
           assignedAuthority: aiResult?.assignedAuthority || "",
           legalContext: aiResult?.legalContext || "",
@@ -280,13 +304,14 @@ export default function NewGrievancePage() {
             >
               <Upload size={18} />
               <span style={{ fontSize: "14px" }}>Click to upload photos</span>
+              <span style={{ fontSize: "11px" }}>PNG, JPG, WEBP, max 10MB each, up to {MAX_EVIDENCE_FILES} files</span>
               <input
                 id="evidence-upload"
                 type="file"
                 accept="image/*"
                 multiple
                 style={{ display: "none" }}
-                onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                onChange={handleEvidenceSelection}
               />
             </label>
 

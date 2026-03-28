@@ -6,6 +6,24 @@ import Grievance from "@/models/Grievance";
 import Petition from "@/models/Petition";
 import User from "@/models/User";
 
+function isAllowedFirebaseImageUrl(value) {
+  if (!value) return true;
+
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (parsed.protocol !== "https:") return false;
+
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "firebasestorage.googleapis.com" ||
+      host.endsWith(".firebasestorage.app") ||
+      host === "storage.googleapis.com"
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
 async function getAuthUserFromRequest(request) {
   const token = request.cookies.get("token")?.value;
 
@@ -98,6 +116,13 @@ export async function PATCH(request, { params }) {
       );
     }
 
+    if (!isAllowedFirebaseImageUrl(proof)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid proof URL" },
+        { status: 400 }
+      );
+    }
+
     const grievance = await Grievance.findById(id);
     if (!grievance) {
       return NextResponse.json(
@@ -125,6 +150,7 @@ export async function PATCH(request, { params }) {
     grievance.statusHistory.push({
       status: newStatus,
       note: String(resolutionNote || "").trim(),
+      proof: String(proof || "").trim(),
       updatedAt: new Date(),
       updatedBy: userId,
     });

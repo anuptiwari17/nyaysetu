@@ -13,6 +13,7 @@ const UserSchema = new Schema(
     state: { type: String, required: true, trim: true, default: "Punjab" },
     authorityId: { type: Schema.Types.ObjectId, ref: "Authority", default: null },
     authorityName: { type: String, default: "", trim: true },
+    isEmailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
   },
   { timestamps: true }

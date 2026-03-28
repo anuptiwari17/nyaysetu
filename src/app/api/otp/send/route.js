@@ -7,44 +7,67 @@ export async function POST(request) {
   try {
     await db();
 
-    const { phone } = await request.json();
-    const normalizedPhone = String(phone || "").trim();
+    const { channel, email, phone, purpose } = await request.json();
+    const normalizedChannel = String(channel || (email ? "email" : "phone")).trim().toLowerCase();
+    const normalizedPurpose = String(purpose || "register").trim().toLowerCase();
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedPhone = String(phone || "")
+      .replace(/\D/g, "")
+      .slice(-10);
 
-    if (!/^\d{10}$/.test(normalizedPhone)) {
+    if (!["email", "phone"].includes(normalizedChannel)) {
+      return NextResponse.json(
+        { success: false, message: "channel must be email or phone" },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedChannel === "phone" && !/^\d{10}$/.test(normalizedPhone)) {
       return NextResponse.json(
         { success: false, message: "Phone must be a valid 10-digit number" },
         { status: 400 }
       );
     }
 
-    const otp = "241240";
+    if (normalizedChannel === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return NextResponse.json(
+        { success: false, message: "Please enter a valid email address" },
+        { status: 400 }
+      );
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    await OTP.deleteMany({ phone: normalizedPhone });
-    await OTP.create({ phone: normalizedPhone, otp, expiresAt, verified: false });
+    await OTP.deleteMany({
+      channel: normalizedChannel,
+      purpose: normalizedPurpose,
+      ...(normalizedChannel === "email" ? { email: normalizedEmail } : { phone: normalizedPhone }),
+    });
 
-    // DEV MODE: Fast2SMS integration is temporarily disabled.
-    // const fast2smsKey = String(process.env.FAST2SMS_KEY || "").trim();
-    // const params = new URLSearchParams({
-    //   authorization: fast2smsKey,
-    //   route: "q",
-    //   message: `Your NyaySetu OTP is ${otp}. Valid for 10 minutes.`,
-    //   numbers: normalizedPhone,
-    //   schedule_time: "",
-    //   flash: "0",
-    // });
-    // await fetch(`https://www.fast2sms.com/dev/bulkV2?${params.toString()}`, {
-    //   method: "GET",
-    //   headers: {
-    //     accept: "application/json",
-    //     authorization: fast2smsKey,
-    //   },
-    //   cache: "no-store",
-    // });
+    await OTP.create({
+      channel: normalizedChannel,
+      purpose: normalizedPurpose,
+      phone: normalizedChannel === "phone" ? normalizedPhone : "",
+      email: normalizedChannel === "email" ? normalizedEmail : "",
+      otp,
+      expiresAt,
+      verified: false,
+    });
 
-    console.log(`[DEV] OTP for ${normalizedPhone}: ${otp}`);
+    const identifier = normalizedChannel === "email" ? normalizedEmail : normalizedPhone;
+    console.log(`[DEV] ${normalizedChannel.toUpperCase()} OTP for ${identifier}: ${otp}`);
 
-    return NextResponse.json({ success: true, message: "OTP sent (dev mode)" }, { status: 200 });
+    const responsePayload = {
+      success: true,
+      message: `${normalizedChannel === "email" ? "Email" : "Phone"} OTP sent (dev mode)`,
+    };
+
+    if (process.env.NODE_ENV !== "production") {
+      responsePayload.devOtp = otp;
+    }
+
+    return NextResponse.json(responsePayload, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error.message || "Failed to send OTP" },

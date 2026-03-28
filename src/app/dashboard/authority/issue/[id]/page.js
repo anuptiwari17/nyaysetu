@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Clock, MapPin, ThumbsUp, Upload, CheckCircle, AlertCircle, Loader } from "lucide-react";
+import { Clock, MapPin, ThumbsUp, Upload, CheckCircle, AlertCircle, Loader, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 import Navbar from "@/components/Navbar";
+import { assertValidImageFile, uploadImageToFirebase } from "@/lib/firebase/storage";
 import { useUser } from "@/lib/useUser";
 
 export default function AuthorityIssueDetailPage() {
@@ -63,7 +64,9 @@ export default function AuthorityIssueDetailPage() {
 
     if (Array.isArray(grievance.statusHistory) && grievance.statusHistory.length > 0) {
       return [...grievance.statusHistory].sort(
-        (a, b) => new Date(a?.date || 0).getTime() - new Date(b?.date || 0).getTime()
+        (a, b) =>
+          new Date(a?.updatedAt || a?.date || 0).getTime() -
+          new Date(b?.updatedAt || b?.date || 0).getTime()
       );
     }
 
@@ -87,19 +90,42 @@ export default function AuthorityIssueDetailPage() {
     return String(status || "reported").replace("_", " ");
   }
 
+  function handleProofFileChange(event) {
+    const selectedFile = event.target.files?.[0] || null;
+    if (!selectedFile) {
+      setProofFile(null);
+      return;
+    }
+
+    try {
+      assertValidImageFile(selectedFile, "Proof image");
+      setProofFile(selectedFile);
+    } catch (fileError) {
+      toast.error(fileError.message || "Invalid proof image");
+      setProofFile(null);
+      event.target.value = "";
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!issueId || !selectedStatus) return;
 
     setSubmitLoading(true);
     try {
+      let proofUrl = "";
+      if (selectedStatus === "resolved" && proofFile) {
+        assertValidImageFile(proofFile, "Proof image");
+        proofUrl = await uploadImageToFirebase(proofFile, "grievances/resolution-proof");
+      }
+
       const response = await fetch(`/api/grievances/${issueId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: selectedStatus,
           resolutionNote,
-          proof: proofFile ? proofFile.name : "",
+          proof: proofUrl,
         }),
       });
 
@@ -130,6 +156,9 @@ export default function AuthorityIssueDetailPage() {
   if (!user || user.role !== "authority") return null;
 
   const badge = statusBadgeStyle(grievance?.status);
+  const reporterName = grievance?.isAnonymous || grievance?.anonymous
+    ? "Anonymous citizen"
+    : grievance?.createdBy?.name || "Unknown citizen";
 
   const statusOptions = [
     { key: "in_progress", label: "In Progress", desc: "Actively being worked on", accentColor: "#B45309", tint: "#FEF3C7", icon: <Loader size={15} color="#B45309" /> },
@@ -190,6 +219,10 @@ export default function AuthorityIssueDetailPage() {
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                   <MapPin size={14} />
                   {grievance?.location || grievance?.city || "Jalandhar"}
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <User size={14} />
+                  Reported by {reporterName}
                 </span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                   <Clock size={14} />
@@ -278,13 +311,38 @@ export default function AuthorityIssueDetailPage() {
                             {prettyStatus(entry?.status)}
                           </span>
                           <p style={{ margin: 0, fontSize: 12, color: "#A8A29E" }}>
-                            {new Date(entry?.date || Date.now()).toLocaleString("en-IN", {
+                            {new Date(entry?.updatedAt || entry?.date || Date.now()).toLocaleString("en-IN", {
                               day: "numeric", month: "short", year: "numeric",
                               hour: "2-digit", minute: "2-digit",
                             })}
                           </p>
                           {entry?.note && (
                             <p style={{ margin: "4px 0 0", fontSize: 13, color: "#78716C" }}>{entry.note}</p>
+                          )}
+                          {entry?.status === "resolved" && (entry?.proof || grievance?.resolutionProof) && (
+                            <div style={{ marginTop: 8 }}>
+                              <p style={{ margin: "0 0 4px", fontSize: 11, color: "#A8A29E" }}>
+                                Resolution proof
+                              </p>
+                              <a
+                                href={entry?.proof || grievance?.resolutionProof}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <img
+                                  src={entry?.proof || grievance?.resolutionProof}
+                                  alt="Resolution proof"
+                                  style={{
+                                    width: 100,
+                                    height: 100,
+                                    objectFit: "cover",
+                                    borderRadius: 10,
+                                    border: "1px solid #EDE8DF",
+                                    cursor: "pointer",
+                                  }}
+                                />
+                              </a>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -405,7 +463,7 @@ export default function AuthorityIssueDetailPage() {
                         type="file"
                         accept="image/*"
                         style={{ display: "none" }}
-                        onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                        onChange={handleProofFileChange}
                       />
                     </label>
                   </div>

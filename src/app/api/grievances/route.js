@@ -6,6 +6,43 @@ import Authority from "@/models/Authority";
 import Grievance from "@/models/Grievance";
 import User from "@/models/User";
 
+const MAX_EVIDENCE_FILES = 5;
+
+function isAllowedFirebaseImageUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (parsed.protocol !== "https:") return false;
+
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "firebasestorage.googleapis.com" ||
+      host.endsWith(".firebasestorage.app") ||
+      host === "storage.googleapis.com"
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function sanitizeEvidenceUrls(evidence) {
+  if (!Array.isArray(evidence)) return [];
+
+  const urls = evidence
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
+  if (urls.length > MAX_EVIDENCE_FILES) {
+    throw new Error(`Only up to ${MAX_EVIDENCE_FILES} evidence images are allowed`);
+  }
+
+  const hasInvalid = urls.some((url) => !isAllowedFirebaseImageUrl(url));
+  if (hasInvalid) {
+    throw new Error("Evidence must contain valid Firebase HTTPS image URLs");
+  }
+
+  return urls;
+}
+
 async function getAuthUserFromRequest(request) {
   const token = request.cookies.get("token")?.value;
 
@@ -133,6 +170,16 @@ export async function POST(request) {
       );
     }
 
+    let evidenceUrls = [];
+    try {
+      evidenceUrls = sanitizeEvidenceUrls(evidence);
+    } catch (validationError) {
+      return NextResponse.json(
+        { success: false, message: validationError.message || "Invalid evidence" },
+        { status: 400 }
+      );
+    }
+
     let assignedAuthorityId = assignedAuthority || null;
 
     if (!assignedAuthorityId) {
@@ -152,7 +199,7 @@ export async function POST(request) {
       category: String(category).trim(),
       city: String(city).trim(),
       location: String(location || "").trim(),
-      evidence: Array.isArray(evidence) ? evidence : [],
+      evidence: evidenceUrls,
       createdBy: authUser._id,
       supportCount: 0,
       supporters: [],

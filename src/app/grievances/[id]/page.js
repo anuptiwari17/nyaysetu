@@ -55,7 +55,9 @@ export default function GrievanceDetailPage() {
     if (!grievance) return [];
     if (Array.isArray(grievance.statusHistory) && grievance.statusHistory.length > 0) {
       return [...grievance.statusHistory].sort(
-        (a, b) => new Date(a?.date || 0).getTime() - new Date(b?.date || 0).getTime()
+        (a, b) =>
+          new Date(a?.updatedAt || a?.date || 0).getTime() -
+          new Date(b?.updatedAt || b?.date || 0).getTime()
       );
     }
     const fallback = [{ status: "reported", date: grievance.createdAt || new Date().toISOString() }];
@@ -313,12 +315,12 @@ export default function GrievanceDetailPage() {
                           {prettyStatus(entry?.status)}
                         </p>
                         <p style={{ margin: "3px 0 0", fontSize: "12px", color: "#999999" }}>
-                          {new Date(entry?.date || Date.now()).toLocaleString()}
+                          {new Date(entry?.updatedAt || entry?.date || Date.now()).toLocaleString()}
                         </p>
-                        {entry?.status === "resolved" && entry?.proof && (
+                        {entry?.status === "resolved" && (entry?.proof || grievance?.resolutionProof) && (
                           <div style={{ marginTop: "8px" }}>
                             <p style={{ margin: 0, fontSize: "11px", color: "#666666" }}>Resolution proof</p>
-                            <img src={entry.proof} alt="Resolution proof" style={{ marginTop: "4px", height: "80px", width: "110px", borderRadius: "8px", objectFit: "cover", border: "1px solid #E8E1D5" }} />
+                            <img src={entry?.proof || grievance?.resolutionProof} alt="Resolution proof" style={{ marginTop: "4px", height: "80px", width: "110px", borderRadius: "8px", objectFit: "cover", border: "1px solid #E8E1D5" }} />
                           </div>
                         )}
                       </div>

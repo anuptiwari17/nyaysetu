@@ -7,12 +7,26 @@ export async function POST(request) {
   try {
     await db();
 
-    const { phone, otp } = await request.json();
-    const normalizedPhone = String(phone || "").trim();
+    const { channel, email, phone, otp, purpose } = await request.json();
+    const normalizedChannel = String(channel || (email ? "email" : "phone")).trim().toLowerCase();
+    const normalizedPurpose = String(purpose || "register").trim().toLowerCase();
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedPhone = String(phone || "")
+      .replace(/\D/g, "")
+      .slice(-10);
     const normalizedOtp = String(otp || "").trim();
 
+    if (!["email", "phone"].includes(normalizedChannel)) {
+      return NextResponse.json(
+        { success: false, message: "channel must be email or phone" },
+        { status: 400 }
+      );
+    }
+
     const otpDoc = await OTP.findOne({
-      phone: normalizedPhone,
+      channel: normalizedChannel,
+      purpose: normalizedPurpose,
+      ...(normalizedChannel === "email" ? { email: normalizedEmail } : { phone: normalizedPhone }),
       expiresAt: { $gt: new Date() },
       verified: false,
     });
@@ -31,7 +45,10 @@ export async function POST(request) {
     otpDoc.verified = true;
     await otpDoc.save();
 
-    return NextResponse.json({ success: true, verified: true }, { status: 200 });
+    return NextResponse.json(
+      { success: true, verified: true, channel: normalizedChannel },
+      { status: 200 }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error.message || "OTP verification failed" },
