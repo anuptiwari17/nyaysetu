@@ -5,25 +5,68 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import User from "@/models/User";
 
+function normalizePhone(rawPhone) {
+  const digits = String(rawPhone || "").replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return digits;
+  }
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits.slice(1);
+  }
+
+  return "";
+}
+
+function isEmailIdentifier(value) {
+  return value.includes("@");
+}
+
 export async function POST(request) {
   try {
     await db();
 
-    const { email, password } = await request.json();
+    const { identifier, email, phone, password } = await request.json();
 
-    if (!email || !password) {
+    // Support both old {email, password} and new {identifier, password} signatures
+    const normalizedIdentifier = String(identifier || email || phone || "").trim();
+
+    if (!normalizedIdentifier || !password) {
       return NextResponse.json(
-        { success: false, message: "Email and password are required" },
+        { success: false, message: "Email or mobile number and password are required" },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
+    const query = isEmailIdentifier(normalizedIdentifier)
+      ? { email: normalizedIdentifier.toLowerCase() }
+      : { phone: normalizePhone(normalizedIdentifier) };
 
-    const user = await User.findOne({ email: normalizedEmail }).select("+password");
+    if (!query.email && !query.phone) {
+      return NextResponse.json(
+        { success: false, message: "Please enter a valid email or mobile number" },
+        { status: 400 }
+      );
+    }
+
+    let user = await User.findOne(query).select('+password');
+    
+    if (!user && isEmailIdentifier(normalizedIdentifier)) {
+      user = await User.findOne({ email: normalizedIdentifier.toLowerCase() }).select('+password');
+    }
+    
+    if (!user && !isEmailIdentifier(normalizedIdentifier)) {
+      user = await User.findOne({ phone: normalizePhone(normalizedIdentifier) }).select('+password');
+    }
+
     if (!user) {
       return NextResponse.json(
-        { success: false, message: "Invalid credentials" },
+        { success: false, message: 'Invalid credentials' },
         { status: 401 }
       );
     }

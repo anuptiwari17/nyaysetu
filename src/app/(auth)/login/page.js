@@ -7,13 +7,10 @@ import { useState } from "react";
 export default function LoginPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showOtp, setShowOtp] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
 
   async function handleSubmit(event) {
@@ -27,7 +24,7 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       const data = await response.json();
@@ -44,8 +41,6 @@ export default function LoginPage() {
 
       if (role === "authority") {
         router.push("/dashboard/authority");
-      } else if (role === "citizen") {
-        router.push("/dashboard/citizen");
       } else {
         router.push("/dashboard/citizen");
       }
@@ -109,19 +104,19 @@ export default function LoginPage() {
           </h1>
 
           <p style={{ fontSize: 14, color: "#4A5568", marginBottom: 20 }}>
-            Continue managing grievances and petition momentum.
+            Use your registered email or mobile number and password.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
-                Email address
+              <label htmlFor="identifier" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
+                Email or Mobile Number
               </label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                id="identifier"
+                type="text"
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
                 required
                 style={{
                   width: "100%",
@@ -173,7 +168,6 @@ export default function LoginPage() {
                     fontWeight: 700,
                     cursor: "pointer",
                   }}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -197,83 +191,6 @@ export default function LoginPage() {
 
             {error ? <p style={{ fontSize: 13, color: "#B91C1C" }}>{error}</p> : null}
           </form>
-
-          <div className="my-7 flex items-center gap-3">
-            <div style={{ height: 1, width: "100%", background: "rgba(0,0,0,0.08)" }} />
-            <span style={{ fontSize: 11, color: "#8A9BAA", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              optional
-            </span>
-            <div style={{ height: 1, width: "100%", background: "rgba(0,0,0,0.08)" }} />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowOtp((prev) => !prev)}
-            className="btn-outline-sm"
-            style={{ width: "100%", textAlign: "center", marginBottom: showOtp ? 10 : 0 }}
-          >
-            {showOtp ? "Hide Phone OTP" : "Login with Phone OTP"}
-          </button>
-
-          {showOtp ? (
-            <div
-              className="mt-4"
-              style={{
-                background: "#FAFAF8",
-                border: "1px solid rgba(0,0,0,0.06)",
-                borderRadius: 14,
-                padding: 14,
-              }}
-            >
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="phone" style={{ display: "block", marginBottom: 6, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
-                    Phone number
-                  </label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    placeholder="Enter your phone number"
-                    style={{
-                      width: "100%",
-                      border: "1px solid rgba(0,0,0,0.08)",
-                      background: "white",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                      fontSize: 14,
-                      color: "#0D1B2A",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="otp" style={{ display: "block", marginBottom: 6, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
-                    OTP
-                  </label>
-                  <input
-                    id="otp"
-                    type="text"
-                    value={otp}
-                    onChange={(event) => setOtp(event.target.value)}
-                    placeholder="Enter OTP"
-                    style={{
-                      width: "100%",
-                      border: "1px solid rgba(0,0,0,0.08)",
-                      background: "white",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                      fontSize: 14,
-                      color: "#0D1B2A",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : null}
 
           <p style={{ marginTop: 28, fontSize: 13, color: "#4A5568" }}>
             Don&apos;t have an account?{" "}

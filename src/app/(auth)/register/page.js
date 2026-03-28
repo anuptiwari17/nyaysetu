@@ -1,100 +1,227 @@
 "use client";
 
+import {
+  RecaptchaVerifier,
+  isSignInWithEmailLink,
+  sendSignInLinkToEmail,
+  signInWithEmailLink,
+  signInWithPhoneNumber,
+  signOut,
+} from "firebase/auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { firebaseAuth } from "@/lib/firebaseClient";
+
+const EMAIL_STORAGE_KEY = "nyaysetu_email_for_signin";
+
+function normalizePhone(rawPhone) {
+  const digits = String(rawPhone || "").replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return digits;
+  }
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits.slice(1);
+  }
+
+  return "";
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim().toLowerCase());
+}
 
 export default function RegisterPage() {
   const router = useRouter();
+  const recaptchaVerifierRef = useRef(null);
 
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState("");
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneConfirmationResult, setPhoneConfirmationResult] = useState(null);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneIdToken, setPhoneIdToken] = useState("");
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [emailLinkSent, setEmailLinkSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailIdToken, setEmailIdToken] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [city, setCity] = useState("Jalandhar");
   const [state, setState] = useState("Punjab");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [countdown, setCountdown] = useState(0);
+  const [info, setInfo] = useState("");
 
   useEffect(() => {
-    if (!otpSent || countdown <= 0) {
+    async function completeEmailLinkSignIn() {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const href = window.location.href;
+
+      if (!isSignInWithEmailLink(firebaseAuth, href)) {
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      setInfo("");
+
+      try {
+        let emailForSignIn = localStorage.getItem(EMAIL_STORAGE_KEY);
+
+        if (!emailForSignIn) {
+          emailForSignIn = window.prompt("Confirm your email to complete verification") || "";
+        }
+
+        if (!isValidEmail(emailForSignIn)) {
+          throw new Error("A valid email is required to complete verification");
+        }
+
+        const result = await signInWithEmailLink(firebaseAuth, emailForSignIn, href);
+        const token = await result.user.getIdToken(true);
+
+        localStorage.removeItem(EMAIL_STORAGE_KEY);
+
+        setEmail(String(emailForSignIn).trim().toLowerCase());
+        setEmailIdToken(token);
+        setEmailVerified(true);
+        setStep((previous) => (previous < 3 ? 3 : previous));
+        setInfo("Email OTP verified successfully. You can now create your account.");
+
+        window.history.replaceState({}, "", "/register");
+      } catch (verifyError) {
+        setError(verifyError.message || "Unable to verify email OTP link.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    completeEmailLinkSignIn();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+    };
+  }, []);
+
+  function ensureRecaptchaVerifier() {
+    if (!recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(firebaseAuth, "firebase-phone-recaptcha", {
+        size: "invisible",
+      });
+    }
+
+    return recaptchaVerifierRef.current;
+  }
+
+  async function sendPhoneOtp() {
+    setError("");
+    setInfo("");
+
+    const normalizedPhone = normalizePhone(phone);
+
+    if (!normalizedPhone) {
+      setError("Enter a valid 10-digit mobile number");
       return;
     }
 
-    const timer = setInterval(() => {
-      setCountdown((previous) => {
-        if (previous <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-
-        return previous - 1;
-      });
-    }, 1000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [otpSent, countdown]);
-
-  async function sendOtp() {
-    setError("");
     setLoading(true);
 
     try {
-      const response = await fetch("/api/otp/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ phone }),
-      });
+      const appVerifier = ensureRecaptchaVerifier();
+      const confirmation = await signInWithPhoneNumber(firebaseAuth, `+91${normalizedPhone}`, appVerifier);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.message || "Failed to send OTP.");
+      setPhoneConfirmationResult(confirmation);
+      setPhoneOtpSent(true);
+      setInfo("Phone OTP sent successfully");
+    } catch (otpError) {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
       }
 
-      setOtpSent(true);
-      setCountdown(30);
-    } catch (otpError) {
-      setError(otpError.message || "Unable to send OTP right now.");
+      setError(otpError.message || "Unable to send phone OTP.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function verifyOtp() {
+  async function verifyPhoneOtp() {
     setError("");
+    setInfo("");
+
+    if (!phoneConfirmationResult) {
+      setError("Send OTP first to continue");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch("/api/otp/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ phone, otp }),
-      });
+      const result = await phoneConfirmationResult.confirm(String(phoneOtp || "").trim());
+      const token = await result.user.getIdToken(true);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.message || "OTP verification failed.");
-      }
-
+      setPhoneIdToken(token);
       setPhoneVerified(true);
       setStep(2);
-      setError("");
+      setInfo("Phone OTP verified. Continue with email OTP verification.");
     } catch (verifyError) {
-      setError(verifyError.message || "Invalid OTP. Please try again.");
+      setError(verifyError.message || "Invalid phone OTP");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendEmailOtpLink() {
+    setError("");
+    setInfo("");
+
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+
+    if (!isValidEmail(normalizedEmail)) {
+      setError("Enter a valid email address");
+      return;
+    }
+
+    if (!phoneVerified) {
+      setError("Verify mobile OTP first");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await sendSignInLinkToEmail(firebaseAuth, normalizedEmail, {
+        url: `${window.location.origin}/register`,
+        handleCodeInApp: true,
+      });
+
+      localStorage.setItem(EMAIL_STORAGE_KEY, normalizedEmail);
+      setEmail(normalizedEmail);
+      setEmailLinkSent(true);
+      setInfo("Email OTP link sent. Open your email and click the verification link.");
+    } catch (emailError) {
+      setError(emailError.message || "Unable to send email OTP link");
     } finally {
       setLoading(false);
     }
@@ -103,6 +230,35 @@ export default function RegisterPage() {
   async function handleRegister(event) {
     event.preventDefault();
     setError("");
+    setInfo("");
+
+    const normalizedPhone = normalizePhone(phone);
+
+    if (!phoneVerified || !emailVerified || !phoneIdToken || !emailIdToken) {
+      setError("Verify both mobile OTP and email OTP before creating your account");
+      return;
+    }
+
+    if (!normalizedPhone) {
+      setError("Invalid mobile number");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setError("Enter a valid email address");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -115,10 +271,12 @@ export default function RegisterPage() {
           name,
           email,
           password,
+          confirmPassword,
           city,
           state,
-          phone,
-          phoneVerified: true,
+          phone: normalizedPhone,
+          phoneIdToken,
+          emailIdToken,
         }),
       });
 
@@ -128,6 +286,7 @@ export default function RegisterPage() {
         throw new Error(data?.message || "Unable to create account.");
       }
 
+      await signOut(firebaseAuth).catch(() => null);
       router.push("/dashboard/citizen");
     } catch (registerError) {
       setError(registerError.message || "Something went wrong. Please try again.");
@@ -189,7 +348,7 @@ export default function RegisterPage() {
           </h1>
 
           <p style={{ fontSize: 14, color: "#4A5568", marginBottom: 16 }}>
-            Join NyaySetu and report civic issues with confidence.
+            Complete mobile OTP and email OTP verification before creating your account.
           </p>
 
           <div className="mb-5 flex items-center gap-2">
@@ -205,7 +364,7 @@ export default function RegisterPage() {
                 color: step === 1 ? "#0D1B2A" : "#8A9BAA",
               }}
             >
-              Verify Phone
+              Verify Mobile
             </span>
             <span
               style={{
@@ -219,7 +378,21 @@ export default function RegisterPage() {
                 color: step === 2 ? "#0D1B2A" : "#8A9BAA",
               }}
             >
-              Your Details
+              Verify Email
+            </span>
+            <span
+              style={{
+                borderRadius: 999,
+                padding: "5px 12px",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                background: step === 3 ? "#F5C842" : "#FAFAF8",
+                color: step === 3 ? "#0D1B2A" : "#8A9BAA",
+              }}
+            >
+              Create Account
             </span>
           </div>
 
@@ -250,89 +423,141 @@ export default function RegisterPage() {
 
               <button
                 type="button"
-                onClick={sendOtp}
-                disabled={loading || phone.trim().length < 10}
+                onClick={sendPhoneOtp}
+                disabled={loading}
                 className="btn-yellow"
                 style={{
                   width: "100%",
                   textAlign: "center",
-                  opacity: loading || phone.trim().length < 10 ? 0.75 : 1,
-                  cursor: loading || phone.trim().length < 10 ? "not-allowed" : "pointer",
-                  marginTop: 8,
+                  opacity: loading ? 0.75 : 1,
+                  cursor: loading ? "not-allowed" : "pointer",
                 }}
               >
-                {loading ? "Sending OTP..." : "Send OTP"}
+                {loading ? "Sending OTP..." : "Send Mobile OTP"}
               </button>
 
-              {otpSent ? (
+              {phoneOtpSent ? (
                 <div
                   style={{
                     background: "#FAFAF8",
                     border: "1px solid rgba(0,0,0,0.06)",
                     borderRadius: 14,
                     padding: 14,
-                    marginTop: 8,
                   }}
                 >
-                  <div>
-                    <label htmlFor="otp" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
-                      Enter OTP
-                    </label>
-                    <input
-                      id="otp"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={otp}
-                      onChange={(event) => setOtp(event.target.value.replace(/\D/g, ""))}
-                      style={{
-                        width: "100%",
-                        border: "1px solid rgba(0,0,0,0.08)",
-                        background: "white",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        fontSize: 20,
-                        letterSpacing: "0.2em",
-                        textAlign: "center",
-                        color: "#0D1B2A",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
+                  <label htmlFor="phoneOtp" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
+                    Enter Mobile OTP
+                  </label>
+                  <input
+                    id="phoneOtp"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={phoneOtp}
+                    onChange={(event) => setPhoneOtp(event.target.value.replace(/\D/g, ""))}
+                    style={{
+                      width: "100%",
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      background: "white",
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                      fontSize: 20,
+                      letterSpacing: "0.2em",
+                      textAlign: "center",
+                      color: "#0D1B2A",
+                      outline: "none",
+                    }}
+                  />
 
                   <button
                     type="button"
-                    onClick={verifyOtp}
-                    disabled={loading || otp.trim().length !== 6}
+                    onClick={verifyPhoneOtp}
+                    disabled={loading || phoneOtp.trim().length < 6}
                     className="btn-dark"
                     style={{
                       width: "100%",
-                      textAlign: "center",
                       marginTop: 12,
-                      opacity: loading || otp.trim().length !== 6 ? 0.75 : 1,
-                      cursor: loading || otp.trim().length !== 6 ? "not-allowed" : "pointer",
+                      textAlign: "center",
+                      opacity: loading || phoneOtp.trim().length < 6 ? 0.75 : 1,
+                      cursor: loading || phoneOtp.trim().length < 6 ? "not-allowed" : "pointer",
                     }}
                   >
-                    {loading ? "Verifying..." : "Verify OTP"}
+                    {loading ? "Verifying..." : "Verify Mobile OTP"}
                   </button>
-
-                  <div style={{ marginTop: 10, textAlign: "center" }}>
-                    {countdown > 0 ? (
-                      <span style={{ fontSize: 12, color: "#8A9BAA" }}>Resend in {countdown}s</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={sendOtp}
-                        style={{ border: "none", background: "transparent", fontSize: 12, color: "#0D1B2A", fontWeight: 700, cursor: "pointer" }}
-                      >
-                        Resend OTP
-                      </button>
-                    )}
-                  </div>
                 </div>
               ) : null}
             </div>
-          ) : (
+          ) : null}
+
+          {step === 2 ? (
+            <div className="space-y-5">
+              <div>
+                <label htmlFor="email" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
+                  Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  style={{
+                    width: "100%",
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    background: "#FAFAF8",
+                    borderRadius: 12,
+                    padding: "12px 14px",
+                    fontSize: 14,
+                    color: "#0D1B2A",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={sendEmailOtpLink}
+                disabled={loading}
+                className="btn-yellow"
+                style={{
+                  width: "100%",
+                  textAlign: "center",
+                  opacity: loading ? 0.75 : 1,
+                  cursor: loading ? "not-allowed" : "pointer",
+                }}
+              >
+                {loading ? "Sending Email OTP..." : "Send Email OTP"}
+              </button>
+
+              {emailLinkSent && !emailVerified ? (
+                <div
+                  style={{
+                    background: "#FAFAF8",
+                    border: "1px solid rgba(0,0,0,0.06)",
+                    borderRadius: 14,
+                    padding: 14,
+                  }}
+                >
+                  <p style={{ fontSize: 13, color: "#4A5568" }}>
+                    We sent a one-time email OTP link. Open it to verify your email, then come back here.
+                  </p>
+                </div>
+              ) : null}
+
+              {emailVerified ? (
+                <button
+                  type="button"
+                  onClick={() => setStep(3)}
+                  className="btn-dark"
+                  style={{ width: "100%", textAlign: "center" }}
+                >
+                  Continue to Create Account
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {step === 3 ? (
             <form onSubmit={handleRegister} className="space-y-5">
               <div>
                 <label htmlFor="name" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
@@ -358,11 +583,11 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label htmlFor="email" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
-                  Email address
+                <label htmlFor="finalEmail" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
+                  Verified Email
                 </label>
                 <input
-                  id="email"
+                  id="finalEmail"
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -417,9 +642,51 @@ export default function RegisterPage() {
                       fontWeight: 700,
                       cursor: "pointer",
                     }}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 600, color: "#4A5568" }}>
+                  Confirm Password
+                </label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      background: "#FAFAF8",
+                      borderRadius: 12,
+                      padding: "12px 44px 12px 14px",
+                      fontSize: 14,
+                      color: "#0D1B2A",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((previous) => !previous)}
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      border: "none",
+                      background: "transparent",
+                      color: "#4A5568",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {showConfirmPassword ? "Hide" : "Show"}
                   </button>
                 </div>
               </div>
@@ -482,21 +749,23 @@ export default function RegisterPage() {
 
               <button
                 type="submit"
-                disabled={loading || !phoneVerified}
+                disabled={loading || !phoneVerified || !emailVerified}
                 className="btn-yellow"
                 style={{
                   width: "100%",
                   textAlign: "center",
-                  opacity: loading || !phoneVerified ? 0.75 : 1,
-                  cursor: loading || !phoneVerified ? "not-allowed" : "pointer",
-                  marginTop: 10,
+                  opacity: loading || !phoneVerified || !emailVerified ? 0.75 : 1,
+                  cursor: loading || !phoneVerified || !emailVerified ? "not-allowed" : "pointer",
                 }}
               >
                 {loading ? "Creating Account..." : "Create Account"}
               </button>
             </form>
-          )}
+          ) : null}
 
+          <div id="firebase-phone-recaptcha" />
+
+          {info ? <p style={{ marginTop: 12, fontSize: 13, color: "#0F766E" }}>{info}</p> : null}
           {error ? <p style={{ marginTop: 12, fontSize: 13, color: "#B91C1C" }}>{error}</p> : null}
 
           <p style={{ marginTop: 28, fontSize: 13, color: "#4A5568" }}>

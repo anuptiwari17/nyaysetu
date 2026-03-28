@@ -1,4 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+This is a [Next.js](https://nextjs.org) project for NyaySetu.
+
+## Environment Setup
+
+Create a `.env` file from `.env.example` and provide values for:
+
+- `MONGODB_URI`
+- `JWT_SECRET`
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+
+For `FIREBASE_PRIVATE_KEY`, keep line breaks escaped as `\n` in the `.env` value.
+
+## Authentication Flow
+
+Registration now requires both verifications before account creation:
+
+1. Mobile OTP verification using Firebase Phone Auth.
+2. Email OTP verification using Firebase one-time email sign-in link.
+3. Password + confirm password and profile details submission.
+
+Login now accepts either:
+
+- Email + password
+- Mobile number + password
 
 ## Getting Started
 
