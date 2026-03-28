@@ -19,14 +19,10 @@ export default function CitizenDashboardPage() {
   const [signingId, setSigningId] = useState("");
 
   const stats = useMemo(() => {
-    const issuesReported = issues.length;
-    const issuesResolved = issues.filter((item) => item?.status === "resolved").length;
-    const petitionsSigned = signedPetitionIds.length;
-
     return {
-      issuesReported,
-      petitionsSigned,
-      issuesResolved,
+      issuesReported: issues.length,
+      petitionsSigned: signedPetitionIds.length,
+      issuesResolved: issues.filter((item) => item?.status === "resolved").length,
       publicPetitions: publicPetitions.length,
     };
   }, [issues, signedPetitionIds, publicPetitions]);
@@ -38,276 +34,302 @@ export default function CitizenDashboardPage() {
   }, [isLoading, user, router]);
 
   useEffect(() => {
-    if (!user || user.role !== "citizen") {
-      return;
-    }
-
+    if (!user || user.role !== "citizen") return;
     let isActive = true;
 
     async function loadCitizenData() {
       setStatsLoading(true);
       setPetitionsLoading(true);
-
       try {
         const [grievancesRes, signedRes, publicRes] = await Promise.all([
           fetch("/api/grievances"),
           fetch("/api/petitions?signedBy=me&limit=100"),
           fetch("/api/petitions?limit=12"),
         ]);
-
         const grievancesJson = await grievancesRes.json().catch(() => ({}));
         const signedJson = await signedRes.json().catch(() => ({}));
         const publicJson = await publicRes.json().catch(() => ({}));
-
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
 
         const grievancesList = Array.isArray(grievancesJson?.grievances)
           ? grievancesJson.grievances
-          : Array.isArray(grievancesJson?.data)
-            ? grievancesJson.data
-            : [];
-
+          : Array.isArray(grievancesJson?.data) ? grievancesJson.data : [];
         const signedList = Array.isArray(signedJson?.petitions)
           ? signedJson.petitions
-          : Array.isArray(signedJson?.data)
-            ? signedJson.data
-            : [];
-
+          : Array.isArray(signedJson?.data) ? signedJson.data : [];
         const publicList = Array.isArray(publicJson?.petitions)
           ? publicJson.petitions
-          : Array.isArray(publicJson?.data)
-            ? publicJson.data
-            : [];
-
-        const signedIds = signedList
-          .map((item) => String(item?._id || item?.id || ""))
-          .filter(Boolean);
+          : Array.isArray(publicJson?.data) ? publicJson.data : [];
 
         setIssues(grievancesList);
         setPublicPetitions(publicList);
-        setSignedPetitionIds(signedIds);
-      } catch (_error) {
-        if (!isActive) {
-          return;
-        }
-
+        setSignedPetitionIds(
+          signedList.map((item) => String(item?._id || item?.id || "")).filter(Boolean)
+        );
+      } catch {
+        if (!isActive) return;
         setIssues([]);
         setPublicPetitions([]);
         setSignedPetitionIds([]);
       } finally {
-        if (!isActive) {
-          return;
-        }
-
+        if (!isActive) return;
         setStatsLoading(false);
         setPetitionsLoading(false);
       }
     }
 
     loadCitizenData();
-
-    return () => {
-      isActive = false;
-    };
+    return () => { isActive = false; };
   }, [user]);
 
   async function handleSignPetition(petitionId) {
     const id = String(petitionId || "");
-    if (!id || signingId || signedPetitionIds.includes(id)) {
-      return;
-    }
-
+    if (!id || signingId || signedPetitionIds.includes(id)) return;
     setSigningId(id);
-
     try {
-      const response = await fetch(`/api/petitions/${id}/sign`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Unable to sign petition");
-      }
-
-      setSignedPetitionIds((previous) => Array.from(new Set([...previous, id])));
-      setPublicPetitions((previous) =>
-        previous.map((petition) => {
-          const petitionIdValue = String(petition?._id || petition?.id || "");
-          if (petitionIdValue !== id) {
-            return petition;
-          }
-
-          const signatures = Array.isArray(petition?.signatures) ? [...petition.signatures] : [];
+      const response = await fetch(`/api/petitions/${id}/sign`, { method: "POST" });
+      if (!response.ok) throw new Error("Unable to sign petition");
+      setSignedPetitionIds((prev) => Array.from(new Set([...prev, id])));
+      setPublicPetitions((prev) =>
+        prev.map((p) => {
+          const pid = String(p?._id || p?.id || "");
+          if (pid !== id) return p;
+          const signatures = Array.isArray(p?.signatures) ? [...p.signatures] : [];
           signatures.push("signed");
-
-          return {
-            ...petition,
-            signatures,
-          };
+          return { ...p, signatures };
         })
       );
-    } catch (_error) {
-      return;
-    } finally {
+    } catch { /* silent */ } finally {
       setSigningId("");
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "#FAFAF8" }}>
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#4A6FA9] border-t-transparent" />
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#FAFAF8" }}>
+        <div style={{ height: "32px", width: "32px", borderRadius: "50%", border: "2px solid #0D1B2A", borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  if (!user || user.role !== "citizen") {
-    return null;
-  }
+  if (!user || user.role !== "citizen") return null;
+
+  const statCards = [
+    { label: "Issues Reported", value: stats.issuesReported },
+    { label: "Public Petitions", value: stats.publicPetitions },
+    { label: "Petitions Signed", value: stats.petitionsSigned },
+    { label: "Issues Resolved", value: stats.issuesResolved },
+  ];
 
   return (
-    <div className="min-h-screen" style={{ background: "#FAFAF8", fontFamily: "DM Sans, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#FAFAF8", fontFamily: "DM Sans, sans-serif" }}>
       <Navbar />
 
-      <main className="mx-auto flex min-h-screen w-full max-w-[1380px] pt-16">
+      {/* Root layout: sidebar + scrollable main */}
+      <div style={{ display: "flex", maxWidth: "1380px", margin: "0 auto", paddingTop: "64px" }}>
         <CitizenSidebar user={user} />
 
-        <section className="min-w-0 flex-1 px-6 py-12 md:px-9 lg:px-12">
-          <div className="mx-auto w-full max-w-[980px] space-y-14">
+        {/* ── Main content ── */}
+        <main style={{ flex: 1, minWidth: 0, overflowX: "hidden", padding: "20px 40px 80px" }}>
+          <div style={{ maxWidth: "860px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "36px" }}>
+
+            {/* ── Hero card ── */}
             <section
-              className="rounded-[24px] bg-white px-7 py-9 md:px-9"
-              style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
+              style={{
+                background: "#FFFFFF",
+                borderRadius: "20px",
+                padding: "36px",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+              }}
             >
-              <p
-                className="text-[11px] font-semibold uppercase tracking-[0.12em]"
-                style={{ color: "#4A5568" }}
-              >
+              <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#4A5568" }}>
                 Citizen Workspace
               </p>
-
               <h1
-                className="mt-4 text-[38px] leading-[1.02] md:text-[46px]"
-                style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 700 }}
+                style={{
+                  margin: "10px 0 0",
+                  fontSize: "clamp(32px, 4vw, 46px)",
+                  lineHeight: 1.04,
+                  color: "#0D1B2A",
+                  fontFamily: "Fraunces, serif",
+                  fontWeight: 700,
+                }}
               >
                 Dashboard
               </h1>
-
-              <p className="mt-5 max-w-[700px] text-[17px] leading-[1.8]" style={{ color: "#4A5568" }}>
-                Track civic activity in {user?.city || "Jalandhar"}, review petition momentum, and
-                take your next action quickly.
+              <p style={{ margin: "14px 0 0", fontSize: "16px", lineHeight: 1.75, color: "#4A5568", maxWidth: "600px" }}>
+                Track civic activity in {user?.city || "Jalandhar"}, review petition momentum, and take your next action quickly.
               </p>
 
-              <div className="mt-9 flex flex-col gap-4 sm:flex-row md:hidden">
-                <Link
-                  href="/legal-assistant"
-                  className="inline-flex items-center justify-center rounded-[50px] px-6 py-3.5 text-[15px] font-semibold no-underline"
-                  style={{ border: "1px solid #D1D5DB", background: "#FFFFFF", color: "#4A5568" }}
-                >
-                  Ask Legal AI
-                </Link>
-                <Link
-                  href="/petition/new"
-                  className="inline-flex items-center justify-center rounded-[50px] px-6 py-3.5 text-[15px] font-semibold no-underline"
-                  style={{ background: "#F5C842", color: "#0D1B2A" }}
-                >
-                  Create Petition
-                </Link>
-                <Link
-                  href="/grievances/new"
-                  className="inline-flex items-center justify-center rounded-[50px] px-6 py-3.5 text-[15px] font-semibold no-underline"
-                  style={{ border: "1px solid #D1D5DB", background: "#FFFFFF", color: "#4A5568" }}
-                >
-                  Report an Issue
-                </Link>
+              {/* Mobile-only CTAs (hidden on md+, sidebar handles desktop) */}
+              <div
+                className="md:hidden"
+                style={{ marginTop: "20px", display: "flex", flexWrap: "wrap", gap: "10px" }}
+              >
+                {[
+                  { href: "/legal-assistant", label: "Ask Legal AI", style: { background: "#FFFFFF", border: "1px solid #D1D5DB", color: "#4A5568" } },
+                  { href: "/petition/new", label: "Create Petition", style: { background: "#F5C842", color: "#0D1B2A" } },
+                  { href: "/grievances/new", label: "Report an Issue", style: { background: "#FFFFFF", border: "1px solid #D1D5DB", color: "#4A5568" } },
+                ].map(({ href, label, style }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "50px",
+                      padding: "10px 20px",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      ...style,
+                    }}
+                  >
+                    {label}
+                  </Link>
+                ))}
               </div>
             </section>
 
-            <section className="grid grid-cols-2 gap-5 lg:grid-cols-4">
-              {statsLoading ? (
-                <>
-                  <div className="h-[130px] animate-pulse rounded-[20px]" style={{ background: "#F3F4F6" }} />
-                  <div className="h-[130px] animate-pulse rounded-[20px]" style={{ background: "#F3F4F6" }} />
-                  <div className="h-[130px] animate-pulse rounded-[20px]" style={{ background: "#F3F4F6" }} />
-                  <div className="h-[130px] animate-pulse rounded-[20px]" style={{ background: "#F3F4F6" }} />
-                </>
-              ) : (
-                <>
-                  <div className="rounded-[20px] bg-white px-5 py-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                    <p style={{ color: "#4A5568", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      Issues Reported
-                    </p>
-                    <p className="mt-4 text-[36px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
-                      {stats.issuesReported}
-                    </p>
-                  </div>
-                  <div className="rounded-[20px] bg-white px-5 py-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                    <p style={{ color: "#4A5568", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      Public Petitions
-                    </p>
-                    <p className="mt-4 text-[36px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
-                      {stats.publicPetitions}
-                    </p>
-                  </div>
-                  <div className="rounded-[20px] bg-white px-5 py-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                    <p style={{ color: "#4A5568", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      Petitions Signed
-                    </p>
-                    <p className="mt-4 text-[36px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
-                      {stats.petitionsSigned}
-                    </p>
-                  </div>
-                  <div className="rounded-[20px] bg-white px-5 py-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                    <p style={{ color: "#4A5568", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      Issues Resolved
-                    </p>
-                    <p className="mt-4 text-[36px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
-                      {stats.issuesResolved}
-                    </p>
-                  </div>
-                </>
-              )}
+            {/* ── Stats grid: 4 columns ── */}
+            <section
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: "16px",
+              }}
+            >
+              {statsLoading
+                ? [1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      style={{
+                        height: "120px",
+                        borderRadius: "16px",
+                        background: "#F3F4F6",
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                  ))
+                : statCards.map(({ label, value }) => (
+                    <div
+                      key={label}
+                      style={{
+                        background: "#FFFFFF",
+                        borderRadius: "16px",
+                        padding: "22px 20px",
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          letterSpacing: "0.09em",
+                          textTransform: "uppercase",
+                          color: "#4A5568",
+                        }}
+                      >
+                        {label}
+                      </p>
+                      <p
+                        style={{
+                          margin: "10px 0 0",
+                          fontSize: "38px",
+                          lineHeight: 1,
+                          color: "#0D1B2A",
+                          fontFamily: "Fraunces, serif",
+                          fontWeight: 800,
+                        }}
+                      >
+                        {value}
+                      </p>
+                    </div>
+                  ))}
             </section>
 
-            <section className="space-y-7">
-              <div className="flex flex-wrap items-end justify-between gap-3">
+            {/* ── Public Petitions ── */}
+            <section>
+              {/* Section header */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "12px",
+                  marginBottom: "20px",
+                }}
+              >
                 <div>
                   <h2
-                    className="text-[32px] leading-[1.06]"
-                    style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 700 }}
+                    style={{
+                      margin: 0,
+                      fontSize: "28px",
+                      lineHeight: 1.1,
+                      color: "#0D1B2A",
+                      fontFamily: "Fraunces, serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Public petitions
                   </h2>
-                  <p className="mt-3 text-[16px]" style={{ color: "#4A5568" }}>
+                  <p style={{ margin: "6px 0 0", fontSize: "15px", color: "#4A5568" }}>
                     Sign ongoing civic campaigns from your city.
                   </p>
                 </div>
-
                 <Link
                   href="/petition"
-                  className="inline-flex items-center justify-center rounded-[50px] px-4 py-2 text-[14px] font-semibold no-underline"
-                  style={{ border: "1px solid #D1D5DB", color: "#4A5568", background: "#FFFFFF" }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "50px",
+                    padding: "8px 18px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    border: "1px solid #D1D5DB",
+                    color: "#4A5568",
+                    background: "#FFFFFF",
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
                 >
                   View all
                 </Link>
               </div>
 
-              <div className="space-y-5">
+              {/* Petition cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 {petitionsLoading ? (
-                  <>
-                    <div className="h-[110px] animate-pulse rounded-[20px]" style={{ background: "#F3F4F6" }} />
-                    <div className="h-[110px] animate-pulse rounded-[20px]" style={{ background: "#F3F4F6" }} />
-                    <div className="h-[110px] animate-pulse rounded-[20px]" style={{ background: "#F3F4F6" }} />
-                  </>
+                  [1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      style={{
+                        height: "90px",
+                        borderRadius: "16px",
+                        background: "#F3F4F6",
+                        animation: "pulse 1.5s ease-in-out infinite",
+                      }}
+                    />
+                  ))
                 ) : publicPetitions.length === 0 ? (
                   <div
-                    className="rounded-[20px] bg-white px-6 py-12 text-center"
-                    style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
+                    style={{
+                      background: "#FFFFFF",
+                      borderRadius: "16px",
+                      padding: "48px 24px",
+                      textAlign: "center",
+                      boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                    }}
                   >
-                    <p className="text-[21px] font-semibold" style={{ color: "#0D1B2A" }}>
+                    <p style={{ margin: 0, fontSize: "20px", fontWeight: 600, color: "#0D1B2A" }}>
                       No public petitions yet
                     </p>
-                    <p className="mt-2 text-[15px]" style={{ color: "#4A5568" }}>
+                    <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#4A5568" }}>
                       Community petitions will appear here.
                     </p>
                   </div>
@@ -322,12 +344,28 @@ export default function CitizenDashboardPage() {
                     return (
                       <article
                         key={petitionId || petition?.title}
-                        className="flex flex-col gap-5 rounded-[20px] bg-white px-6 py-6 md:flex-row md:items-center md:gap-6"
-                        style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "16px",
+                          background: "#FFFFFF",
+                          borderRadius: "16px",
+                          padding: "18px 20px",
+                          boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                        }}
                       >
+                        {/* Badge */}
                         <span
-                          className="inline-flex w-fit rounded-[999px] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
                           style={{
+                            flexShrink: 0,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            borderRadius: "999px",
+                            padding: "3px 10px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
                             background: petition?.issueId ? "#FFF8DC" : "#F3F4F6",
                             color: petition?.issueId ? "#0D1B2A" : "#4A5568",
                           }}
@@ -335,38 +373,67 @@ export default function CitizenDashboardPage() {
                           {petition?.issueId ? "Linked" : "Public"}
                         </span>
 
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[19px] font-semibold" style={{ color: "#0D1B2A" }}>
+                        {/* Title + signature count */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "16px",
+                              fontWeight: 600,
+                              color: "#0D1B2A",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
                             {petition?.title || "Untitled petition"}
                           </p>
-                          <p className="mt-2 text-[14px]" style={{ color: "#4A5568" }}>
-                            {signatureCount} signatures
+                          <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#4A5568" }}>
+                            {signatureCount} {signatureCount === 1 ? "signature" : "signatures"}
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2.5">
+                        {/* Actions */}
+                        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
                           <button
                             type="button"
                             onClick={() => handleSignPetition(petitionId)}
                             disabled={isSigned || signingId === petitionId}
-                            className="rounded-[50px] px-4 py-2.5 text-[14px] font-semibold transition-colors"
-                            style={
-                              isSigned
-                                ? { background: "#ECFDF3", color: "#166534", border: "1px solid #BBF7D0" }
-                                : {
-                                    background: "#F5C842",
-                                    color: "#0D1B2A",
-                                    border: "1px solid #F5C842",
-                                  }
-                            }
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "50px",
+                              padding: "8px 18px",
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              cursor: isSigned ? "default" : "pointer",
+                              border: isSigned ? "1px solid #BBF7D0" : "1px solid #F5C842",
+                              background: isSigned ? "#ECFDF3" : "#F5C842",
+                              color: isSigned ? "#166534" : "#0D1B2A",
+                              transition: "all 0.15s",
+                              whiteSpace: "nowrap",
+                            }}
                           >
-                            {signingId === petitionId ? "Signing..." : isSigned ? "Signed" : "Sign"}
+                            {signingId === petitionId ? "Signing…" : isSigned ? "✓ Signed" : "Sign"}
                           </button>
 
                           <Link
                             href={`/petition/${petitionId}`}
-                            className="inline-flex items-center justify-center rounded-[50px] px-4 py-2.5 text-[14px] font-semibold no-underline"
-                            style={{ border: "1px solid #D1D5DB", color: "#4A5568", background: "#FFFFFF" }}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "50px",
+                              padding: "8px 16px",
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              border: "1px solid #D1D5DB",
+                              color: "#4A5568",
+                              background: "#FFFFFF",
+                              textDecoration: "none",
+                              whiteSpace: "nowrap",
+                            }}
                           >
                             View
                           </Link>
@@ -378,8 +445,21 @@ export default function CitizenDashboardPage() {
               </div>
             </section>
           </div>
-        </section>
-      </main>
+        </main>
+      </div>
+
+      {/* Keyframe animations */}
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.45; }
+        }
+        /* Responsive stat grid */
+        @media (max-width: 700px) {
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
     </div>
   );
 }

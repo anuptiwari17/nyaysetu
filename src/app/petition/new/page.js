@@ -22,60 +22,37 @@ export default function NewPetitionPage() {
   const [ownerError, setOwnerError] = useState("");
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
+    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setGrievanceId(params.get("grievanceId") || "");
   }, []);
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login");
-    }
+    if (!isLoading && !user) router.push("/login");
   }, [isLoading, user, router]);
 
   useEffect(() => {
-    if (!grievanceId) {
-      setLinkedIssue(null);
-      return;
-    }
-
+    if (!grievanceId) { setLinkedIssue(null); return; }
     let isActive = true;
 
     async function fetchLinkedIssue() {
       setIssueLoading(true);
-
       try {
-        const response = await fetch(`/api/grievances/${grievanceId}`);
-        const json = await response.json().catch(() => ({}));
-
-        if (!isActive) {
-          return;
-        }
-
+        const res = await fetch(`/api/grievances/${grievanceId}`);
+        const json = await res.json().catch(() => ({}));
+        if (!isActive) return;
         setLinkedIssue(json?.grievance || json?.data || null);
-      } catch (_error) {
-        if (!isActive) {
-          return;
-        }
-
+      } catch {
+        if (!isActive) return;
         setLinkedIssue(null);
       } finally {
-        if (!isActive) {
-          return;
-        }
-
+        if (!isActive) return;
         setIssueLoading(false);
       }
     }
 
     fetchLinkedIssue();
-
-    return () => {
-      isActive = false;
-    };
+    return () => { isActive = false; };
   }, [grievanceId]);
 
   const linkedIssueCreatorId = String(
@@ -87,39 +64,23 @@ export default function NewPetitionPage() {
   const canEscalateThisIssue = !grievanceId || !linkedIssue || (linkedIssueCreatorId && currentUserId === linkedIssueCreatorId);
 
   useEffect(() => {
-    if (!grievanceId) {
-      setOwnerError("");
-      return;
-    }
-
-    if (issueLoading) {
-      return;
-    }
-
+    if (!grievanceId) { setOwnerError(""); return; }
+    if (issueLoading) return;
     if (linkedIssue && !canEscalateThisIssue) {
       setOwnerError("Only the grievance creator can escalate it to a petition.");
       return;
     }
-
     setOwnerError("");
   }, [grievanceId, linkedIssue, issueLoading, canEscalateThisIssue]);
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-
-    if (!canEscalateThisIssue) {
-      setOwnerError("Only the grievance creator can escalate it to a petition.");
-      return;
-    }
-
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!canEscalateThisIssue) { setOwnerError("Only the grievance creator can escalate it to a petition."); return; }
     setSubmitting(true);
-
     try {
-      const response = await fetch("/api/petitions", {
+      const res = await fetch("/api/petitions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
           description,
@@ -127,159 +88,176 @@ export default function NewPetitionPage() {
           type: grievanceId ? "linked" : "independent",
         }),
       });
-
-      const json = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(json?.message || "Unable to create petition");
-      }
-
-      const newId =
-        json?.petition?._id ||
-        json?.petition?.id ||
-        json?.id ||
-        json?.data?._id ||
-        json?.data?.id;
-
-      if (newId) {
-        router.push(`/petition/${newId}`);
-      } else {
-        router.push("/petition");
-      }
-    } catch (_error) {
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || "Unable to create petition");
+      const newId = json?.petition?._id || json?.petition?.id || json?.id || json?.data?._id || json?.data?.id;
+      router.push(newId ? `/petition/${newId}` : "/petition");
+    } catch {
       setSubmitting(false);
-      return;
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "#FAFAF8" }}>
-        <div className="h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: "#4A6FA9", borderTopColor: "transparent" }} />
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#FAFAF8" }}>
+        <div style={{ height: "32px", width: "32px", borderRadius: "50%", border: "2px solid #4A6FA9", borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
+
+  const fieldStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+    padding: "11px 14px",
+    fontSize: "15px",
+    border: "1px solid #E8E1D5",
+    background: "#F5F2ED",
+    color: "#171717",
+    outline: "none",
+    fontFamily: "inherit",
+  };
 
   return (
-    <div className="min-h-screen" style={{ background: "#FAFAF8" }}>
+    <div style={{ minHeight: "100vh", background: "#FAFAF8", fontFamily: "DM Sans, sans-serif" }}>
       <Navbar />
 
-      <main className="mx-auto max-w-[860px] px-5 pb-12 pt-24">
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <Link href={dashboardHref} className="text-[14px] no-underline" style={{ color: "#4A6FA9" }}>
-            ← Dashboard
-          </Link>
-          <span className="text-[12px]" style={{ color: "#999999" }}>
-            |
-          </span>
-          <Link href="/petition" className="text-[14px] no-underline" style={{ color: "#4A6FA9" }}>
-            All Petitions
-          </Link>
+      <main style={{ maxWidth: "680px", margin: "0 auto", padding: "72px 24px 64px" }}>
+
+        {/* Breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px", fontSize: "13px" }}>
+          <Link href={dashboardHref} style={{ color: "#4A6FA9", textDecoration: "none" }}>← Dashboard</Link>
+          <span style={{ color: "#D1D5DB" }}>|</span>
+          <Link href="/petition" style={{ color: "#4A6FA9", textDecoration: "none" }}>All Petitions</Link>
         </div>
 
-        <h1 className="text-[42px] font-semibold leading-[1.15]" style={{ color: "#171717" }}>
+        {/* Header */}
+        <h1 style={{ margin: "0 0 6px", fontSize: "clamp(26px, 4vw, 36px)", fontWeight: 700, lineHeight: 1.1, color: "#171717", fontFamily: "Fraunces, Georgia, serif" }}>
           Start a Petition
         </h1>
-        <p className="mt-2 text-[18px]" style={{ color: "#666666" }}>
+        <p style={{ margin: "0 0 20px", fontSize: "15px", color: "#666666" }}>
           Write clearly, add context, and gather civic support faster.
         </p>
 
-        {grievanceId ? (
-          <div className="mt-5 rounded-[16px] bg-white px-7 py-5" style={{ border: "0.5px solid #E8E1D5" }}>
-            <p className="text-[12px] uppercase tracking-[0.08em]" style={{ color: "#999999" }}>
+        {/* Linked issue banner */}
+        {grievanceId && (
+          <div style={{ background: "#FFFFFF", borderRadius: "12px", padding: "14px 16px", border: "1px solid #E8E1D5", marginBottom: "16px" }}>
+            <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999999" }}>
               Linked Issue
             </p>
             {issueLoading ? (
-              <div className="mt-2 h-[42px] animate-pulse rounded-[10px] bg-gray-100" />
+              <div style={{ height: "36px", borderRadius: "8px", background: "#F3F4F6", animation: "pulse 1.5s ease-in-out infinite" }} />
             ) : (
-              <div
-                className="mt-2 rounded-[12px] bg-[#FAFAF8] px-4 py-3"
-                style={{ border: "0.5px solid #E8E1D5" }}
-              >
-                <p className="text-[16px]" style={{ color: "#666666" }}>
+              <div style={{ borderRadius: "8px", background: "#FAFAF8", padding: "10px 12px", border: "1px solid #E8E1D5" }}>
+                <p style={{ margin: 0, fontSize: "14px", color: "#555555" }}>
                   {linkedIssue?.title || "Linked grievance"}
                 </p>
               </div>
             )}
           </div>
-        ) : null}
+        )}
 
-        {ownerError ? (
-          <div className="mt-4 rounded-[10px] px-3 py-2" style={{ background: "#FEE2E2", border: "0.5px solid #FCA5A5", color: "#B91C1C" }}>
-            <p className="text-[13px]">{ownerError}</p>
+        {/* Owner error */}
+        {ownerError && (
+          <div style={{ borderRadius: "8px", padding: "10px 14px", background: "#FEE2E2", border: "1px solid #FCA5A5", marginBottom: "16px" }}>
+            <p style={{ margin: 0, fontSize: "13px", color: "#B91C1C" }}>{ownerError}</p>
           </div>
-        ) : null}
+        )}
 
+        {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="mt-6 rounded-[18px] bg-white px-10 py-10"
-          style={{ border: "0.5px solid #E8E1D5" }}
+          style={{
+            background: "#FFFFFF",
+            borderRadius: "16px",
+            padding: "24px",
+            border: "1px solid #E8E1D5",
+            display: "flex",
+            flexDirection: "column",
+            gap: "18px",
+          }}
         >
-          <div className="space-y-6">
-            <div>
-              <label
-                htmlFor="petition-title"
-                className="mb-2 block text-[14px] font-medium"
-                style={{ color: "#666666" }}
-              >
-                Title
-              </label>
-              <input
-                id="petition-title"
-                type="text"
-                required
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="w-full rounded-[12px] border px-4 py-3.5 text-[16px] focus:outline-none"
-                style={{ border: "0.5px solid #E8E1D5", background: "#F5F2ED", color: "#171717" }}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="petition-description"
-                className="mb-2 block text-[14px] font-medium"
-                style={{ color: "#666666" }}
-              >
-                Description
-              </label>
-              <textarea
-                id="petition-description"
-                required
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                className="w-full resize-none rounded-[12px] border px-4 py-3.5 text-[16px] leading-[1.65] focus:outline-none"
-                style={{
-                  border: "0.5px solid #E8E1D5",
-                  background: "#F5F2ED",
-                  color: "#171717",
-                  minHeight: "220px",
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={submitting || !canEscalateThisIssue}
-              className="inline-flex w-full items-center justify-center rounded-[12px] px-4 py-4 text-[18px] font-medium text-white"
-              style={canEscalateThisIssue ? { background: "#4A6FA9" } : { background: "#999999" }}
-            >
-              {submitting ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Creating...
-                </span>
-              ) : (
-                "Create Petition"
-              )}
-            </button>
+          {/* Title */}
+          <div>
+            <label htmlFor="petition-title" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 600, color: "#555555" }}>
+              Title
+            </label>
+            <input
+              id="petition-title"
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Fix broken street lights in Model Town"
+              style={fieldStyle}
+            />
           </div>
+
+          {/* Description */}
+          <div>
+            <label htmlFor="petition-description" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 600, color: "#555555" }}>
+              Description
+            </label>
+            <textarea
+              id="petition-description"
+              required
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Explain why this matters, who is affected, and what change you want to see…"
+              style={{ ...fieldStyle, minHeight: "200px", resize: "vertical", lineHeight: 1.65 }}
+            />
+            <p style={{ margin: "5px 0 0", fontSize: "12px", color: "#999999" }}>
+              Be specific and factual. A clear petition gathers more support.
+            </p>
+          </div>
+
+          {/* Type indicator */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", borderRadius: "8px", background: "#F5F2ED", border: "1px solid #E8E1D5" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#999999" }}>Type:</span>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: grievanceId ? "#4A6FA9" : "#555555" }}>
+              {grievanceId ? "Linked to a grievance" : "Independent petition"}
+            </span>
+          </div>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={submitting || !canEscalateThisIssue}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              width: "100%",
+              borderRadius: "10px",
+              padding: "13px",
+              fontSize: "15px",
+              fontWeight: 700,
+              color: "#FFFFFF",
+              background: submitting || !canEscalateThisIssue ? "#9CA3AF" : "#4A6FA9",
+              border: "none",
+              cursor: submitting || !canEscalateThisIssue ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
+              transition: "background 0.15s",
+            }}
+          >
+            {submitting ? (
+              <>
+                <span style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid white", borderTopColor: "transparent", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+                Creating…
+              </>
+            ) : "Create Petition"}
+          </button>
         </form>
       </main>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
+      `}</style>
     </div>
   );
 }

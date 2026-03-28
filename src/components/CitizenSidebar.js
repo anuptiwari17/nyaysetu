@@ -17,124 +17,222 @@ export default function CitizenSidebar({ user }) {
 
   const initials = useMemo(() => {
     const name = String(user?.name || "").trim();
-    if (!name) {
-      return "U";
-    }
-
+    if (!name) return "U";
     const parts = name.split(/\s+/).filter(Boolean);
-    if (parts.length === 1) {
-      return parts[0][0].toUpperCase();
-    }
-
+    if (parts.length === 1) return parts[0][0].toUpperCase();
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   }, [user?.name]);
 
   return (
-    <aside
-      className="flex h-[calc(100vh-64px)] w-[272px] shrink-0 flex-col justify-between p-7"
-      style={{
-        borderRight: "0.5px solid #E8E1D5",
-        background: "#FCFBF8",
-        fontFamily: "DM Sans, sans-serif",
-      }}
-    >
-      <div>
-        <Link
-          href="/"
-          className="no-underline"
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontSize: 24,
-            fontWeight: 700,
-            color: "#0D1B2A",
-            letterSpacing: "-0.03em",
-          }}
-        >
-          Nyay<span style={{ color: "#F5C842" }}>Setu</span>
-        </Link>
+    <>
+      {/* Inline responsive style — avoids Tailwind display conflicts entirely */}
+      <style>{`
+        .citizen-sidebar {
+          display: none;
+        }
+        @media (min-width: 768px) {
+          .citizen-sidebar {
+            display: flex;
+          }
+        }
+        .sidebar-link:hover {
+          background: #EEEBE4 !important;
+          color: #1F2937 !important;
+        }
+        .sidebar-btn:hover {
+          opacity: 0.85;
+        }
+      `}</style>
 
-        <div
-          className="mt-7 flex h-12 w-12 items-center justify-center rounded-full"
-          style={{ background: "#F2EEE7", color: "#2F3D53", fontWeight: 600, fontSize: 15 }}
-        >
-          {initials}
+      <aside
+        className="citizen-sidebar"
+        style={{
+          width: "240px",
+          minWidth: "240px",
+          maxWidth: "240px",
+          height: "calc(100vh - 64px)",
+          position: "sticky",
+          top: "64px",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "28px 16px 24px",
+          background: "#FCFBF8",
+          borderRight: "1px solid #E8E1D5",
+          overflowY: "auto",
+          boxSizing: "border-box",
+          flexShrink: 0,
+        }}
+      >
+        {/* ── Top: user info + nav ── */}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {/* Avatar */}
+          <div
+            style={{
+              height: "42px",
+              width: "42px",
+              minWidth: "42px",
+              borderRadius: "50%",
+              background: "#F2EEE7",
+              color: "#2F3D53",
+              fontWeight: 700,
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {initials}
+          </div>
+
+          {/* Name */}
+          <p
+            style={{
+              margin: "10px 0 0",
+              fontSize: "17px",
+              fontWeight: 700,
+              lineHeight: 1.25,
+              color: "#171717",
+              fontFamily: "Fraunces, Georgia, serif",
+            }}
+          >
+            {user?.name || "Citizen"}
+          </p>
+
+          {/* City badge */}
+          <span
+            style={{
+              display: "inline-block",
+              marginTop: "6px",
+              borderRadius: "20px",
+              padding: "3px 10px",
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+              background: "#F2EEE7",
+              color: "#556070",
+              alignSelf: "flex-start",
+            }}
+          >
+            {user?.city || "Jalandhar"}
+          </span>
+
+          {/* Nav links */}
+          <nav
+            style={{
+              marginTop: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "2px",
+            }}
+          >
+            {sidebarLinks.map((link) => {
+              const isActive =
+                pathname === link.href || pathname.startsWith(`${link.href}/`);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="sidebar-link"
+                  style={{
+                    display: "block",
+                    borderRadius: "10px",
+                    padding: "9px 12px",
+                    fontSize: "14px",
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? "#1F2937" : "#5F636A",
+                    background: isActive ? "#F2EEE7" : "transparent",
+                    textDecoration: "none",
+                    transition: "background 0.15s, color 0.15s",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    fontFamily: isActive
+                      ? "Fraunces, Georgia, serif"
+                      : "DM Sans, sans-serif",
+                  }}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
-        <p
-          className="mt-4 text-[22px] font-semibold leading-[1.2]"
-          style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif" }}
-        >
-          {user?.name || "Citizen"}
-        </p>
-
-        <span
-          className="mt-2 inline-block rounded-[20px] px-2.5 py-1 text-[11px] font-semibold tracking-[0.06em]"
-          style={{ background: "#FFF8DC", color: "#4A5568" }}
-        >
-          {user?.city || "Jalandhar"}
-        </span>
-
-        <nav className="mt-12 flex flex-col gap-4">
-          {sidebarLinks.map((link) => {
-            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-[50px] px-5 py-4 text-[16px] no-underline transition-colors"
-                style={
-                  isActive
-                    ? {
-                        background: "#FFF8DC",
-                        color: "#0D1B2A",
-                      fontWeight: 700,
-                      }
-                    : {
-                        color: "#4A5568",
-                      fontWeight: 600,
-                      }
-                }
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      <div className="space-y-3.5">
-        <Link
-          href="/legal-assistant"
-          className="inline-flex w-full items-center justify-center rounded-[50px] px-4 py-4 text-[14px] font-semibold no-underline transition-colors"
+        {/* ── Bottom: action buttons ── */}
+        <div
           style={{
-            border: "1px solid #D9D1C5",
-            color: "#4A5568",
-            background: "#FFFFFF",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            marginTop: "24px",
           }}
         >
-          Ask Legal AI
-        </Link>
+          <Link
+            href="/legal-assistant"
+            className="sidebar-btn"
+            style={{
+              display: "block",
+              width: "100%",
+              boxSizing: "border-box",
+              borderRadius: "10px",
+              padding: "10px 14px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#4B5563",
+              background: "#FFFFFF",
+              border: "1px solid #D9D1C5",
+              textDecoration: "none",
+              textAlign: "center",
+              transition: "opacity 0.15s",
+            }}
+          >
+            Ask Legal AI
+          </Link>
 
-        <Link
-          href="/petition/new"
-          className="inline-flex w-full items-center justify-center rounded-[50px] px-4 py-4 text-[15px] font-semibold no-underline transition-colors"
-          style={{ background: "#F5C842", color: "#0D1B2A" }}
-        >
-          Create Petition
-        </Link>
+          <Link
+            href="/petition/new"
+            className="sidebar-btn"
+            style={{
+              display: "block",
+              width: "100%",
+              boxSizing: "border-box",
+              borderRadius: "10px",
+              padding: "10px 14px",
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#FFFFFF",
+              background: "#1F2937",
+              textDecoration: "none",
+              textAlign: "center",
+              transition: "opacity 0.15s",
+            }}
+          >
+            Create Petition
+          </Link>
 
-        <Link
-          href="/grievances/new"
-          className="inline-flex w-full items-center justify-center rounded-[50px] px-4 py-4 text-[14px] font-semibold no-underline transition-colors"
-          style={{
-            border: "1px solid #D9D1C5",
-            color: "#4A5568",
-            background: "#FFFFFF",
-          }}
-        >
-          Report an Issue
-        </Link>
-      </div>
-    </aside>
+          <Link
+            href="/grievances/new"
+            className="sidebar-btn"
+            style={{
+              display: "block",
+              width: "100%",
+              boxSizing: "border-box",
+              borderRadius: "10px",
+              padding: "10px 14px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#4B5563",
+              background: "#FFFFFF",
+              border: "1px solid #D9D1C5",
+              textDecoration: "none",
+              textAlign: "center",
+              transition: "opacity 0.15s",
+            }}
+          >
+            Report an Issue
+          </Link>
+        </div>
+      </aside>
+    </>
   );
 }

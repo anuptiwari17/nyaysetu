@@ -195,10 +195,17 @@ export default function AuthorityDashboardPage() {
     <div className="min-h-screen" style={{ background: "#FAFAF8", fontFamily: "DM Sans, sans-serif" }}>
       <Navbar />
 
-      <main className="mx-auto flex min-h-screen w-full max-w-[1380px] pt-16">
+      <main className="mx-auto flex min-h-screen w-full max-w-[1360px] pt-16">
         <aside
-          className="h-[calc(100vh-64px)] w-[272px] shrink-0 flex-col justify-between p-7 flex"
-          style={{ borderRight: "0.5px solid #E8E1D5", background: "#FCFBF8" }}
+          className="h-[calc(100vh-64px)] w-[264px] shrink-0 flex-col justify-between p-6 flex"
+          style={{
+            borderRight: "0.5px solid #E8E1D5",
+            background: "#FCFBF8",
+            position: "sticky",
+            top: "64px",
+            alignSelf: "flex-start",
+            overflowY: "auto",
+          }}
         >
           <div>
             <Link
@@ -225,24 +232,24 @@ export default function AuthorityDashboardPage() {
               Track assigned grievances, update statuses, and close issues with proof.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3">
+            <div className="mt-7 flex flex-col gap-2">
               <Link
                 href="/dashboard/authority"
-                className="rounded-[50px] px-5 py-3.5 text-[15px] font-semibold no-underline"
+                className="rounded-[50px] px-4 py-2.5 text-[14px] font-semibold no-underline"
                 style={{ background: "#FFF8DC", color: "#0D1B2A" }}
               >
                 Dashboard
               </Link>
               <Link
                 href="/grievances"
-                className="rounded-[50px] px-5 py-3.5 text-[15px] font-medium no-underline"
+                className="rounded-[50px] px-4 py-2.5 text-[14px] font-medium no-underline"
                 style={{ color: "#4A5568" }}
               >
                 Public Grievances
               </Link>
               <Link
                 href="/legal-assistant"
-                className="rounded-[50px] px-5 py-3.5 text-[15px] font-medium no-underline"
+                className="rounded-[50px] px-4 py-2.5 text-[14px] font-medium no-underline"
                 style={{ color: "#4A5568" }}
               >
                 Legal Assistant
@@ -250,11 +257,11 @@ export default function AuthorityDashboardPage() {
             </div>
           </div>
 
-          <div className="space-y-3.5">
+          <div className="space-y-2.5">
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex w-full items-center justify-center rounded-[50px] px-4 py-3.5 text-[14px] font-semibold"
+              className="inline-flex w-full items-center justify-center rounded-[50px] px-4 py-3 text-[14px] font-semibold"
               style={{ background: "#F5C842", border: "1px solid #F5C842", color: "#0D1B2A" }}
             >
               Logout
@@ -262,10 +269,10 @@ export default function AuthorityDashboardPage() {
           </div>
         </aside>
 
-        <section className="min-w-0 flex-1 px-6 pb-12 pt-12 md:px-9 lg:px-12">
+        <section className="min-w-0 flex-1 px-5 pb-10 pt-6 md:px-8">
           <div className="mx-auto w-full max-w-[1020px]">
             <section
-              className="rounded-[24px] bg-white px-7 py-8 md:px-9"
+              className="rounded-[24px] bg-white px-6 py-7 md:px-8"
               style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
             >
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -277,7 +284,7 @@ export default function AuthorityDashboardPage() {
                     {departmentName}
                   </h1>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span
                       className="rounded-[999px] px-3 py-1 text-[12px] font-semibold"
                       style={{ background: "#FFF8DC", color: "#0D1B2A" }}
@@ -309,20 +316,20 @@ export default function AuthorityDashboardPage() {
               </div>
             </section>
 
-            <section className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">
-          <article className="rounded-[20px] bg-white px-5 py-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+          <section className="mt-9 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <article className="rounded-[20px] bg-white px-5 py-6" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
             <div className="flex items-start justify-between">
               <p style={{ color: "#4A5568", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 Assigned Issues
               </p>
               <Inbox size={20} style={{ color: "#4A6FA9" }} />
             </div>
-            <p className="mt-4 text-[38px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
+            <p className="mt-3 text-[38px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
               {stats.assignedIssues}
             </p>
           </article>
 
-          <article className="rounded-[20px] bg-white px-5 py-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+          <article className="rounded-[20px] bg-white px-5 py-6" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
             <div className="flex items-start justify-between">
               <p style={{ color: "#4A5568", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 In Progress
@@ -331,25 +338,25 @@ export default function AuthorityDashboardPage() {
                 <Clock size={16} style={{ color: "#B45309" }} />
               </span>
             </div>
-            <p className="mt-4 text-[38px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
+            <p className="mt-3 text-[38px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
               {stats.inProgress}
             </p>
           </article>
 
-          <article className="rounded-[20px] bg-white px-5 py-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+          <article className="rounded-[20px] bg-white px-5 py-6" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
             <div className="flex items-start justify-between">
               <p style={{ color: "#4A5568", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 Resolved This Month
               </p>
               <CheckCircle size={20} style={{ color: "#2E7D32" }} />
             </div>
-            <p className="mt-4 text-[38px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
+            <p className="mt-3 text-[38px] leading-none" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 800 }}>
               {stats.resolvedThisMonth}
             </p>
           </article>
           </section>
 
-            <section className="mt-14 rounded-[24px] bg-white px-6 py-7 md:px-7" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+          <section className="mt-12 rounded-[24px] bg-white px-5 py-6 md:px-6" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-[30px] leading-[1.05]" style={{ color: "#0D1B2A", fontFamily: "Fraunces, serif", fontWeight: 700 }}>
               Assigned Grievances
@@ -383,7 +390,7 @@ export default function AuthorityDashboardPage() {
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
+          <div className="mt-4 flex flex-wrap gap-2">
             {["all", "pending", "in_progress", "resolved"].map((tab) => (
               <button
                 key={tab}
@@ -407,7 +414,7 @@ export default function AuthorityDashboardPage() {
             ))}
           </div>
 
-          <div className="mt-6 space-y-5">
+          <div className="mt-5 space-y-4">
             {issuesLoading ? (
               <>
                 <div className="h-[170px] animate-pulse rounded-[20px] bg-gray-100" />
@@ -432,7 +439,7 @@ export default function AuthorityDashboardPage() {
                 return (
                   <article
                     key={issue?._id || issue?.id || issue?.title}
-                    className="rounded-[20px] bg-[#FAFAF8] px-6 py-6"
+                    className="rounded-[20px] bg-[#FAFAF8] px-5 py-5"
                     style={{ border: "1px solid rgba(0,0,0,0.06)" }}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -469,7 +476,7 @@ export default function AuthorityDashboardPage() {
                       {String(issue?.description || "").length > 100 ? "..." : ""}
                     </p>
 
-                    <div className="mt-5 flex flex-wrap items-center gap-4">
+                    <div className="mt-4 flex flex-wrap items-center gap-4">
                       <div className="inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#4A6FA9" }}>
                         <ThumbsUp size={14} />
                         <span>{issue?.supportCount || 0}</span>

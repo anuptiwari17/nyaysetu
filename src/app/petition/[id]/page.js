@@ -26,75 +26,48 @@ export default function PetitionDetailPage() {
   const [signers, setSigners] = useState([]);
 
   useEffect(() => {
-    if (!petitionId) {
-      return;
-    }
-
+    if (!petitionId) return;
     let isActive = true;
 
     async function fetchPetition() {
       setLoading(true);
-
       try {
-        const response = await fetch(`/api/petitions/${petitionId}`);
-        const json = await response.json().catch(() => ({}));
+        const res = await fetch(`/api/petitions/${petitionId}`);
+        const json = await res.json().catch(() => ({}));
+        if (!isActive) return;
 
-        if (!isActive) {
-          return;
-        }
-
-        const nextPetition = json?.petition || json?.data || null;
-        setPetition(nextPetition);
+        const next = json?.petition || json?.data || null;
+        setPetition(next);
 
         const userId = String(user?._id || user?.id || "");
-        const signedFromFlag = nextPetition?.hasSigned === true || nextPetition?.isSigned === true;
-        const signedFromSignatures = Array.isArray(nextPetition?.signatures)
-          ? nextPetition.signatures.some((item) => {
+        const fromFlag = next?.hasSigned === true || next?.isSigned === true;
+        const fromSigs = Array.isArray(next?.signatures)
+          ? next.signatures.some((item) => {
               const id = typeof item === "string" ? item : item?._id || item?.id;
               return String(id || "") === userId;
             })
           : false;
-
-        const signedFromEntries = Array.isArray(nextPetition?.signerEntries)
-          ? nextPetition.signerEntries.some((entry) => String(entry?.user || "") === userId)
+        const fromEntries = Array.isArray(next?.signerEntries)
+          ? next.signerEntries.some((e) => String(e?.user || "") === userId)
           : false;
-
-        setHasSigned(Boolean(signedFromFlag || signedFromSignatures || signedFromEntries));
-      } catch (_error) {
-        if (!isActive) {
-          return;
-        }
-
+        setHasSigned(Boolean(fromFlag || fromSigs || fromEntries));
+      } catch {
+        if (!isActive) return;
         setPetition(null);
       } finally {
-        if (!isActive) {
-          return;
-        }
-
+        if (!isActive) return;
         setLoading(false);
       }
     }
 
     fetchPetition();
-
-    return () => {
-      isActive = false;
-    };
+    return () => { isActive = false; };
   }, [petitionId, user?._id, user?.id]);
 
   const signatureCount = useMemo(() => {
-    if (!petition) {
-      return 0;
-    }
-
-    if (Array.isArray(petition?.signerEntries)) {
-      return petition.signerEntries.length;
-    }
-
-    if (Number.isFinite(Number(petition?.signatureCount))) {
-      return Number(petition.signatureCount);
-    }
-
+    if (!petition) return 0;
+    if (Array.isArray(petition?.signerEntries)) return petition.signerEntries.length;
+    if (Number.isFinite(Number(petition?.signatureCount))) return Number(petition.signatureCount);
     return Array.isArray(petition?.signatures) ? petition.signatures.length : 0;
   }, [petition]);
 
@@ -110,229 +83,125 @@ export default function PetitionDetailPage() {
   const canManagePetition = Boolean(currentUserId && petitionCreatorId && currentUserId === petitionCreatorId);
 
   useEffect(() => {
-    if (!petitionId || !canManagePetition) {
-      setSigners([]);
-      return;
-    }
-
+    if (!petitionId || !canManagePetition) { setSigners([]); return; }
     let isActive = true;
 
     async function fetchSigners() {
       setSignersLoading(true);
       setSignersError("");
-
       try {
-        const response = await fetch(`/api/petitions/${petitionId}/signers`);
-        const json = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(json?.message || "Unable to fetch signer list");
-        }
-
-        if (!isActive) {
-          return;
-        }
-
+        const res = await fetch(`/api/petitions/${petitionId}/signers`);
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.message || "Unable to fetch signer list");
+        if (!isActive) return;
         setSigners(Array.isArray(json?.signers) ? json.signers : []);
-      } catch (error) {
-        if (!isActive) {
-          return;
-        }
-
+      } catch (err) {
+        if (!isActive) return;
         setSigners([]);
-        setSignersError(error.message || "Unable to fetch signer list");
+        setSignersError(err.message || "Unable to fetch signer list");
       } finally {
-        if (!isActive) {
-          return;
-        }
-
+        if (!isActive) return;
         setSignersLoading(false);
       }
     }
 
     fetchSigners();
-
-    return () => {
-      isActive = false;
-    };
+    return () => { isActive = false; };
   }, [petitionId, canManagePetition]);
 
   async function handleSign() {
-    if (!userLoading && !user) {
-      router.push("/login");
-      return;
-    }
-
-    if (!petitionId || hasSigned || isClosed) {
-      return;
-    }
-
+    if (!userLoading && !user) { router.push("/login"); return; }
+    if (!petitionId || hasSigned || isClosed) return;
     setSigning(true);
-
     try {
-      const response = await fetch(`/api/petitions/${petitionId}/sign`, {
-        method: "POST",
-      });
-
-      const json = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(json?.message || "Unable to sign petition");
-      }
-
+      const res = await fetch(`/api/petitions/${petitionId}/sign`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || "Unable to sign petition");
       setHasSigned(true);
-      setPetition((previous) => {
-        if (!previous) {
-          return previous;
-        }
-
-        return {
-          ...previous,
-          signatureCount: Number(previous.signatureCount || signatureCount) + 1,
-        };
-      });
-
+      setPetition((prev) => prev ? { ...prev, signatureCount: Number(prev.signatureCount || signatureCount) + 1 } : prev);
       if (canManagePetition) {
-        setSigners((previous) => {
-          const alreadyInList = previous.some((item) => String(item?.id || "") === currentUserId);
-          if (alreadyInList) {
-            return previous;
-          }
-
-          return [
-            {
-              id: currentUserId,
-              name: user?.name || "You",
-              city: user?.city || "N/A",
-              state: user?.state || "N/A",
-              signedAt: new Date().toISOString(),
-            },
-            ...previous,
-          ];
+        setSigners((prev) => {
+          if (prev.some((item) => String(item?.id || "") === currentUserId)) return prev;
+          return [{ id: currentUserId, name: user?.name || "You", city: user?.city || "N/A", state: user?.state || "N/A", signedAt: new Date().toISOString() }, ...prev];
         });
       }
-    } catch (_error) {
-      if (!user) {
-        router.push("/login");
-      }
+    } catch {
+      if (!user) router.push("/login");
     } finally {
       setSigning(false);
     }
   }
 
   async function handleDeclareVictory() {
-    if (!petitionId || !canManagePetition || isClosed || actionLoading) {
-      return;
-    }
-
+    if (!petitionId || !canManagePetition || isClosed || actionLoading) return;
     setActionLoading(true);
     setActionError("");
-
     try {
-      const response = await fetch(`/api/petitions/${petitionId}`, {
+      const res = await fetch(`/api/petitions/${petitionId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "declare_victory" }),
       });
-
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(json?.message || "Unable to declare victory");
-      }
-
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || "Unable to declare victory");
       const updated = json?.petition || json?.data || null;
-      if (updated) {
-        setPetition(updated);
-      }
-    } catch (error) {
-      setActionError(error.message || "Unable to declare victory");
+      if (updated) setPetition(updated);
+    } catch (err) {
+      setActionError(err.message || "Unable to declare victory");
     } finally {
       setActionLoading(false);
     }
   }
 
   async function handleDeletePetition() {
-    if (!petitionId || !canManagePetition || actionLoading) {
-      return;
-    }
-
-    const shouldDelete = window.confirm("Delete this petition permanently?");
-    if (!shouldDelete) {
-      return;
-    }
-
+    if (!petitionId || !canManagePetition || actionLoading) return;
+    if (!window.confirm("Delete this petition permanently?")) return;
     setActionLoading(true);
     setActionError("");
-
     try {
-      const response = await fetch(`/api/petitions/${petitionId}`, {
-        method: "DELETE",
-      });
-
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(json?.message || "Unable to delete petition");
-      }
-
+      const res = await fetch(`/api/petitions/${petitionId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || "Unable to delete petition");
       router.push("/petition");
-    } catch (error) {
-      setActionError(error.message || "Unable to delete petition");
+    } catch (err) {
+      setActionError(err.message || "Unable to delete petition");
       setActionLoading(false);
     }
   }
 
   function handleExportSigners() {
-    if (!Array.isArray(signers) || signers.length === 0) {
-      return;
-    }
-
+    if (!Array.isArray(signers) || signers.length === 0) return;
     const header = ["Name", "City", "State", "Signed On"];
-    const rows = signers.map((signer) => [
-      signer?.name || "",
-      signer?.city || "",
-      signer?.state || "",
-      signer?.signedAt ? new Date(signer.signedAt).toLocaleString() : "",
-    ]);
-
-    const csvLines = [header, ...rows].map((row) =>
-      row
-        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-        .join(",")
-    );
-
-    const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const rows = signers.map((s) => [s?.name || "", s?.city || "", s?.state || "", s?.signedAt ? new Date(s.signedAt).toLocaleString() : ""]);
+    const csv = [header, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.setAttribute("download", `petition-signers-${petitionId}.csv`);
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    const a = document.createElement("a");
+    a.href = url;
+    a.setAttribute("download", `petition-signers-${petitionId}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
     URL.revokeObjectURL(url);
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "#FAFAF8" }}>
-        <div className="h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: "#4A6FA9", borderTopColor: "transparent" }} />
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#FAFAF8" }}>
+        <div style={{ height: "32px", width: "32px", borderRadius: "50%", border: "2px solid #4A6FA9", borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   if (!petition) {
     return (
-      <div className="min-h-screen" style={{ background: "#FAFAF8" }}>
+      <div style={{ minHeight: "100vh", background: "#FAFAF8", fontFamily: "DM Sans, sans-serif" }}>
         <Navbar />
-        <main className="mx-auto max-w-[700px] px-5 pt-24">
-          <Link href="/petition" className="text-[14px] no-underline" style={{ color: "#4A6FA9" }}>
-            ← All Petitions
-          </Link>
-          <div className="mt-4 rounded-[14px] bg-white px-6 py-10 text-center" style={{ border: "0.5px solid #E8E1D5" }}>
-            <p className="text-[18px] font-semibold" style={{ color: "#171717" }}>
-              Petition not found
-            </p>
+        <main style={{ maxWidth: "680px", margin: "0 auto", padding: "72px 24px 64px" }}>
+          <Link href="/petition" style={{ fontSize: "14px", color: "#4A6FA9", textDecoration: "none" }}>← All Petitions</Link>
+          <div style={{ marginTop: "16px", background: "#FFFFFF", borderRadius: "14px", padding: "48px 24px", textAlign: "center", border: "1px solid #E8E1D5" }}>
+            <p style={{ margin: 0, fontSize: "18px", fontWeight: 600, color: "#171717" }}>Petition not found</p>
           </div>
         </main>
       </div>
@@ -341,207 +210,212 @@ export default function PetitionDetailPage() {
 
   const linkedIssueId =
     (typeof petition?.issueId === "object" ? petition?.issueId?._id || petition?.issueId?.id : petition?.issueId) ||
-    petition?.grievanceId ||
-    "";
+    petition?.grievanceId || "";
   const linkedIssueTitle =
     (typeof petition?.issueId === "object" ? petition?.issueId?.title : "") ||
-    petition?.grievanceTitle ||
-    petition?.issueTitle ||
-    "";
+    petition?.grievanceTitle || petition?.issueTitle || "";
 
   return (
-    <div className="min-h-screen" style={{ background: "#FAFAF8" }}>
+    <div style={{ minHeight: "100vh", background: "#FAFAF8", fontFamily: "DM Sans, sans-serif" }}>
       <Navbar />
 
-      <main className="mx-auto max-w-[700px] px-5 pb-10 pt-24">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href={dashboardHref} className="text-[14px] no-underline" style={{ color: "#4A6FA9" }}>
-            ← Dashboard
-          </Link>
-          <span className="text-[12px]" style={{ color: "#999999" }}>
-            |
-          </span>
-          <Link href="/petition" className="text-[14px] no-underline" style={{ color: "#4A6FA9" }}>
-            All Petitions
-          </Link>
+      <main style={{ maxWidth: "680px", margin: "0 auto", padding: "72px 24px 64px" }}>
+
+        {/* Breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", fontSize: "13px" }}>
+          <Link href={dashboardHref} style={{ color: "#4A6FA9", textDecoration: "none" }}>← Dashboard</Link>
+          <span style={{ color: "#D1D5DB" }}>|</span>
+          <Link href="/petition" style={{ color: "#4A6FA9", textDecoration: "none" }}>All Petitions</Link>
         </div>
 
-        <article className="mt-4 rounded-[14px] bg-white px-9 py-8" style={{ border: "0.5px solid #E8E1D5" }}>
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className="inline-block rounded-[20px] px-3 py-1.5 text-[11px] uppercase"
-              style={{ background: "#ECF0FF", color: "#4A6FA9" }}
-            >
+        {/* Main article */}
+        <article style={{ background: "#FFFFFF", borderRadius: "16px", padding: "24px", border: "1px solid #E8E1D5" }}>
+
+          {/* Status badges */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span style={{ borderRadius: "20px", padding: "4px 10px", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", background: "#EEF2FF", color: "#4A6FA9" }}>
               Petition
             </span>
-            <span
-              className="inline-block rounded-[20px] px-3 py-1.5 text-[11px] uppercase"
-              style={isClosed ? { background: "#DCFCE7", color: "#16A34A" } : { background: "#FEF3C7", color: "#B45309" }}
-            >
+            <span style={{ borderRadius: "20px", padding: "4px 10px", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", ...(isClosed ? { background: "#DCFCE7", color: "#16A34A" } : { background: "#FEF3C7", color: "#B45309" }) }}>
               {isClosed ? "Victory Declared" : "Active"}
             </span>
           </div>
 
-          <h1 className="mt-3 text-[32px] font-semibold" style={{ color: "#171717" }}>
+          {/* Title */}
+          <h1 style={{ margin: "12px 0 0", fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 700, lineHeight: 1.2, color: "#171717", fontFamily: "Fraunces, Georgia, serif" }}>
             {petition?.title || "Untitled petition"}
           </h1>
 
-          {linkedIssueId || linkedIssueTitle ? (
-            <div className="mt-4">
-              <p className="text-[12px]" style={{ color: "#999999" }}>
-                Linked Issue
-              </p>
-              <div
-                className="mt-1.5 rounded-[10px] bg-[#FAFAF8] px-3.5 py-2.5"
-                style={{ border: "0.5px solid #E8E1D5" }}
-              >
-                <p className="text-[14px]" style={{ color: "#666666" }}>
+          {/* Linked issue */}
+          {(linkedIssueId || linkedIssueTitle) && (
+            <div style={{ marginTop: "14px" }}>
+              <p style={{ margin: "0 0 5px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999999" }}>Linked Issue</p>
+              <div style={{ borderRadius: "8px", background: "#FAFAF8", padding: "10px 12px", border: "1px solid #E8E1D5" }}>
+                <p style={{ margin: 0, fontSize: "14px", color: "#555555" }}>
                   {linkedIssueTitle || "Linked grievance"}
                 </p>
-                {linkedIssueId ? (
-                  <Link
-                    href={`/grievances/${linkedIssueId}`}
-                    className="mt-1 inline-block text-[12px] no-underline"
-                    style={{ color: "#4A6FA9" }}
-                  >
+                {linkedIssueId && (
+                  <Link href={`/grievances/${linkedIssueId}`} style={{ display: "inline-block", marginTop: "4px", fontSize: "12px", color: "#4A6FA9", textDecoration: "none" }}>
                     View Issue →
                   </Link>
-                ) : null}
+                )}
               </div>
             </div>
-          ) : null}
+          )}
 
-          <p className="mt-4 text-[16px] leading-[1.8]" style={{ color: "#666666" }}>
+          {/* Description */}
+          <p style={{ margin: "14px 0 0", fontSize: "15px", lineHeight: 1.8, color: "#555555" }}>
             {petition?.description || "No description provided."}
           </p>
 
-          <section className="mt-6">
-            <p className="text-[22px] font-semibold" style={{ color: "#171717" }}>
-              {signatureCount} of 100 signatures
-            </p>
+          {/* Divider */}
+          <div style={{ height: "1px", background: "#F0EDE8", margin: "20px 0" }} />
 
-            <div className="mt-2 h-2 w-full rounded-[4px]" style={{ background: "#F5F2ED" }}>
-              <div className="h-2 rounded-[4px]" style={{ width: `${progressWidth}%`, background: "#4A6FA9" }} />
+          {/* Signature progress */}
+          <div>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "8px" }}>
+              <p style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#171717" }}>
+                {signatureCount} <span style={{ fontSize: "15px", fontWeight: 500, color: "#999999" }}>of 100 signatures</span>
+              </p>
+              <span style={{ fontSize: "13px", color: "#999999" }}>{progressWidth}%</span>
             </div>
 
+            {/* Progress bar */}
+            <div style={{ marginTop: "10px", height: "8px", borderRadius: "4px", background: "#F0EDE8", overflow: "hidden" }}>
+              <div style={{ height: "100%", borderRadius: "4px", background: "#4A6FA9", width: `${progressWidth}%`, transition: "width 0.3s ease" }} />
+            </div>
+
+            {/* Sign button */}
             <button
               type="button"
               onClick={handleSign}
               disabled={hasSigned || signing || isClosed}
-              className="mt-5 inline-flex w-full items-center justify-center rounded-[10px] px-4 py-3.5 text-[16px] font-medium"
-              style={
-                isClosed
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                marginTop: "14px",
+                borderRadius: "10px",
+                padding: "13px",
+                fontSize: "15px",
+                fontWeight: 700,
+                border: "none",
+                cursor: hasSigned || isClosed ? "default" : "pointer",
+                fontFamily: "inherit",
+                transition: "background 0.15s",
+                ...(isClosed
                   ? { background: "#F5F2ED", color: "#999999" }
                   : hasSigned
-                  ? { background: "#ECF0FF", color: "#4A6FA9" }
-                  : { background: "#4A6FA9", color: "#FFFFFF" }
-              }
+                  ? { background: "#ECFDF3", color: "#16A34A" }
+                  : { background: "#4A6FA9", color: "#FFFFFF" }),
+              }}
             >
-              {signing
-                ? "Signing..."
-                : isClosed
-                  ? "Petition closed by creator"
-                  : hasSigned
-                    ? "You've signed this ✓"
-                    : "Sign this Petition"}
+              {signing ? "Signing…" : isClosed ? "Petition closed" : hasSigned ? "✓ You've signed this" : "Sign this Petition"}
             </button>
 
-            <p className="mt-2 text-[14px]" style={{ color: "#666666" }}>
-              {signatureCount} citizens have signed
+            <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#999999", textAlign: "center" }}>
+              {signatureCount} {signatureCount === 1 ? "citizen has" : "citizens have"} signed
             </p>
+          </div>
 
-            {canManagePetition ? (
-              <div className="mt-5 space-y-3">
-                {!isClosed ? (
-                  <button
-                    type="button"
-                    onClick={handleDeclareVictory}
-                    disabled={actionLoading}
-                    className="inline-flex w-full items-center justify-center rounded-[10px] px-4 py-3 text-[15px] font-medium"
-                    style={{ background: "#ECF0FF", color: "#4A6FA9", border: "1px solid #D4DFF5" }}
-                  >
-                    {actionLoading ? "Saving..." : "Declare Victory"}
-                  </button>
-                ) : null}
+          {/* Creator controls */}
+          {canManagePetition && (
+            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ height: "1px", background: "#F0EDE8" }} />
+              <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999999" }}>
+                Creator Controls
+              </p>
 
+              {!isClosed && (
                 <button
                   type="button"
-                  onClick={handleDeletePetition}
+                  onClick={handleDeclareVictory}
                   disabled={actionLoading}
-                  className="inline-flex w-full items-center justify-center rounded-[10px] px-4 py-3 text-[15px] font-medium"
-                  style={{ background: "#FEE2E2", color: "#B91C1C", border: "1px solid #FCA5A5" }}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: "100%", borderRadius: "10px", padding: "11px", fontSize: "14px", fontWeight: 600,
+                    background: "#EEF2FF", color: "#4A6FA9", border: "1px solid #C7D2F0",
+                    cursor: actionLoading ? "not-allowed" : "pointer", fontFamily: "inherit",
+                  }}
                 >
-                  {actionLoading ? "Please wait..." : "Delete Petition"}
+                  {actionLoading ? "Saving…" : "Declare Victory"}
                 </button>
+              )}
 
-                {actionError ? (
-                  <p className="text-[13px]" style={{ color: "#B91C1C" }}>
-                    {actionError}
-                  </p>
-                ) : null}
+              <button
+                type="button"
+                onClick={handleDeletePetition}
+                disabled={actionLoading}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: "100%", borderRadius: "10px", padding: "11px", fontSize: "14px", fontWeight: 600,
+                  background: "#FEE2E2", color: "#B91C1C", border: "1px solid #FCA5A5",
+                  cursor: actionLoading ? "not-allowed" : "pointer", fontFamily: "inherit",
+                }}
+              >
+                {actionLoading ? "Please wait…" : "Delete Petition"}
+              </button>
 
-                <div className="mt-4 rounded-[12px] px-4 py-4" style={{ background: "#FAFAF8", border: "0.5px solid #E8E1D5" }}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[15px] font-semibold" style={{ color: "#171717" }}>
-                      Signer List
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleExportSigners}
-                      disabled={signersLoading || signers.length === 0}
-                      className="rounded-[9px] px-3 py-1.5 text-[13px] font-medium"
-                      style={{
-                        background: signers.length === 0 ? "#F5F2ED" : "#ECF0FF",
-                        color: signers.length === 0 ? "#999999" : "#4A6FA9",
-                        border: "1px solid #D4DFF5",
-                      }}
-                    >
-                      Export CSV
-                    </button>
-                  </div>
+              {actionError && (
+                <p style={{ margin: 0, fontSize: "13px", color: "#B91C1C" }}>{actionError}</p>
+              )}
 
-                  {signersError ? (
-                    <p className="mt-2 text-[13px]" style={{ color: "#B91C1C" }}>
-                      {signersError}
-                    </p>
-                  ) : null}
+              {/* Signers list */}
+              <div style={{ borderRadius: "12px", padding: "14px", background: "#FAFAF8", border: "1px solid #E8E1D5" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "10px" }}>
+                  <p style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#171717" }}>Signer List</p>
+                  <button
+                    type="button"
+                    onClick={handleExportSigners}
+                    disabled={signersLoading || signers.length === 0}
+                    style={{
+                      borderRadius: "8px", padding: "5px 12px", fontSize: "12px", fontWeight: 600,
+                      background: signers.length === 0 ? "#F5F2ED" : "#EEF2FF",
+                      color: signers.length === 0 ? "#999999" : "#4A6FA9",
+                      border: "1px solid #C7D2F0",
+                      cursor: signers.length === 0 ? "not-allowed" : "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                </div>
 
-                  <div className="mt-3 max-h-[230px] space-y-2 overflow-y-auto pr-1">
-                    {signersLoading ? (
-                      <>
-                        <div className="h-[48px] animate-pulse rounded-[9px]" style={{ background: "#F5F2ED" }} />
-                        <div className="h-[48px] animate-pulse rounded-[9px]" style={{ background: "#F5F2ED" }} />
-                      </>
-                    ) : signers.length === 0 ? (
-                      <p className="text-[13px]" style={{ color: "#666666" }}>
-                        No signatures yet.
-                      </p>
-                    ) : (
-                      signers.map((signer) => (
-                        <div
-                          key={`${signer.id}-${signer.signedAt}`}
-                          className="rounded-[9px] px-3 py-2"
-                          style={{ border: "0.5px solid #E8E1D5", background: "#FFFFFF" }}
-                        >
-                          <p className="text-[14px] font-medium" style={{ color: "#171717" }}>
-                            {signer.name}
-                          </p>
-                          <p className="mt-0.5 text-[12px]" style={{ color: "#666666" }}>
-                            {signer.city}, {signer.state}
-                          </p>
-                          <p className="mt-0.5 text-[12px]" style={{ color: "#999999" }}>
-                            Signed on: {signer.signedAt ? new Date(signer.signedAt).toLocaleString() : "N/A"}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                {signersError && <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#B91C1C" }}>{signersError}</p>}
+
+                <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {signersLoading ? (
+                    [1, 2].map((i) => (
+                      <div key={i} style={{ height: "56px", borderRadius: "8px", background: "#F5F2ED", animation: "pulse 1.5s ease-in-out infinite" }} />
+                    ))
+                  ) : signers.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: "13px", color: "#999999" }}>No signatures yet.</p>
+                  ) : (
+                    signers.map((signer) => (
+                      <div
+                        key={`${signer.id}-${signer.signedAt}`}
+                        style={{ borderRadius: "8px", padding: "10px 12px", border: "1px solid #E8E1D5", background: "#FFFFFF" }}
+                      >
+                        <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "#171717" }}>{signer.name}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#666666" }}>{signer.city}, {signer.state}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#999999" }}>
+                          {signer.signedAt ? new Date(signer.signedAt).toLocaleString() : "N/A"}
+                        </p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-            ) : null}
-          </section>
+            </div>
+          )}
         </article>
       </main>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
+      `}</style>
     </div>
   );
 }

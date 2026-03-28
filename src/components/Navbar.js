@@ -39,8 +39,13 @@ export default function Navbar() {
 
   return (
     <nav
-      className="sticky top-0 z-50"
+      className="fixed inset-x-0 top-0 z-[200]"
       style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        width: "100vw",
         height: 64,
         background: "rgba(255,255,255,0.92)",
         backdropFilter: "blur(12px)",

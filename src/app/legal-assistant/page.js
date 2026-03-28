@@ -1,6 +1,7 @@
 "use client";
 
-import { Scale, Search, Sparkles } from "lucide-react";
+import { Scale, Search, Sparkles, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { useMemo, useState } from "react";
 
@@ -14,6 +15,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export default function LegalAssistantPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,18 +24,13 @@ export default function LegalAssistantPage() {
   const hasResults = sessions.length > 0;
 
   const latestSession = useMemo(() => {
-    if (!hasResults) {
-      return null;
-    }
-
+    if (!hasResults) return null;
     return sessions[0];
   }, [hasResults, sessions]);
 
   async function askLegalAssistant(nextQuery) {
     const input = String(nextQuery || query).trim();
-    if (!input || loading) {
-      return;
-    }
+    if (!input || loading) return;
 
     setLoading(true);
     setError("");
@@ -41,9 +38,7 @@ export default function LegalAssistantPage() {
     try {
       const response = await fetch("/api/ai/legal-advice", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: input }),
       });
 
@@ -60,162 +55,291 @@ export default function LegalAssistantPage() {
         vectorMatches: Array.isArray(json?.vectorMatches) ? json.vectorMatches : [],
       };
 
-      setSessions((previous) => [next, ...previous]);
+      setSessions((prev) => [next, ...prev]);
       setQuery("");
-    } catch (requestError) {
-      setError(requestError?.message || "Unable to fetch legal advice right now.");
+    } catch (err) {
+      setError(err?.message || "Unable to fetch legal advice right now.");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleSubmit(event) {
-    event.preventDefault();
+  function handleSubmit(e) {
+    e.preventDefault();
     askLegalAssistant();
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "#FAFAF8" }}>
+    <div style={{ minHeight: "100vh", background: "#FAFAF8", fontFamily: "DM Sans, sans-serif" }}>
       <Navbar />
 
-      <main className="mx-auto max-w-[1100px] px-5 pb-16 pt-24">
-        <div>
-          <p className="text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: "#6B7280" }}>
+      <main style={{ maxWidth: "860px", margin: "0 auto", padding: "88px 24px 64px" }}>
+
+        <div style={{ marginBottom: "16px" }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                router.back();
+                return;
+              }
+              router.push("/dashboard/citizen");
+            }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "50px",
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: 600,
+              border: "1px solid #D1D5DB",
+              background: "#FFFFFF",
+              color: "#4A5568",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+
+        {/* ── Page header ── */}
+        <div style={{ marginBottom: "28px" }}>
+          <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6B7280" }}>
             AI Legal Assistant
           </p>
-          <h1
-            className="mt-2 text-[44px] font-semibold leading-[1.08]"
-            style={{ color: "#111827", fontFamily: "Georgia, 'Times New Roman', serif" }}
-          >
+          <h1 style={{ margin: "8px 0 0", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, lineHeight: 1.08, color: "#111827", fontFamily: "Fraunces, Georgia, serif" }}>
             Ask a legal question
           </h1>
-          <p className="mt-3 max-w-[780px] text-[18px] leading-[1.7]" style={{ color: "#4B5563" }}>
-            Get AI-generated legal guidance grounded in your legal RAG pipeline. Advice is shown in markdown format.
+          <p style={{ margin: "10px 0 0", fontSize: "16px", lineHeight: 1.7, color: "#4B5563", maxWidth: "640px" }}>
+            Get AI-generated legal guidance grounded in Indian law. Describe your situation in detail for the best advice.
           </p>
         </div>
 
-        <section className="mt-8 rounded-[18px] bg-white p-6" style={{ border: "1px solid #E5E7EB" }}>
+        {/* ── Query form ── */}
+        <section style={{ background: "#FFFFFF", borderRadius: "16px", padding: "24px", border: "1px solid #E5E7EB", marginBottom: "24px" }}>
           <form onSubmit={handleSubmit}>
-            <label htmlFor="legal-query" className="mb-2 block text-[14px] font-semibold" style={{ color: "#374151" }}>
+            <label
+              htmlFor="legal-query"
+              style={{ display: "block", marginBottom: "8px", fontSize: "13px", fontWeight: 600, color: "#374151" }}
+            >
               Your legal query
             </label>
+
             <textarea
               id="legal-query"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="Describe your issue in detail. Mention timeline, parties involved, and key facts."
-              className="w-full resize-none rounded-[12px] px-4 py-3 text-[16px] leading-[1.7] focus:outline-none"
-              style={{ minHeight: "140px", border: "1px solid #D1D5DB", background: "#FFFFFF", color: "#111827" }}
+              style={{
+                width: "100%",
+                minHeight: "130px",
+                borderRadius: "10px",
+                padding: "12px 14px",
+                fontSize: "15px",
+                lineHeight: 1.7,
+                border: "1px solid #D1D5DB",
+                background: "#FAFAF8",
+                color: "#111827",
+                resize: "vertical",
+                boxSizing: "border-box",
+                outline: "none",
+                fontFamily: "inherit",
+              }}
             />
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            {/* Suggested prompts */}
+            <div style={{ marginTop: "12px", display: "flex", flexWrap: "wrap", gap: "8px" }}>
               {SUGGESTED_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   type="button"
                   onClick={() => askLegalAssistant(prompt)}
                   disabled={loading}
-                  className="rounded-[999px] px-3 py-1.5 text-[12px] font-semibold"
-                  style={{ border: "1px solid #D1D5DB", background: "#FFFFFF", color: "#4B5563" }}
+                  style={{
+                    borderRadius: "999px",
+                    padding: "6px 12px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    border: "1px solid #D1D5DB",
+                    background: "#FFFFFF",
+                    color: "#4B5563",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.6 : 1,
+                    fontFamily: "inherit",
+                  }}
                 >
                   {prompt}
                 </button>
               ))}
             </div>
 
-            {error ? (
-              <p className="mt-3 text-[13px]" style={{ color: "#B91C1C" }}>
-                {error}
-              </p>
-            ) : null}
+            {/* Error */}
+            {error && (
+              <p style={{ marginTop: "10px", fontSize: "13px", color: "#B91C1C" }}>{error}</p>
+            )}
 
-            <div className="mt-5 flex items-center gap-3">
+            {/* Actions */}
+            <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
               <button
                 type="submit"
                 disabled={loading || !query.trim()}
-                className="inline-flex items-center justify-center rounded-[12px] px-6 py-3 text-[15px] font-semibold text-white"
-                style={{ background: loading || !query.trim() ? "#9CA3AF" : "#111827" }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  borderRadius: "10px",
+                  padding: "11px 22px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#FFFFFF",
+                  background: loading || !query.trim() ? "#9CA3AF" : "#111827",
+                  border: "none",
+                  cursor: loading || !query.trim() ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                  transition: "background 0.15s",
+                }}
               >
-                <Search size={16} className="mr-2" />
-                {loading ? "Getting advice..." : "Get Legal Advice"}
+                <Search size={15} />
+                {loading ? "Getting advice…" : "Get Legal Advice"}
               </button>
 
-              {hasResults ? (
+              {hasResults && (
                 <button
                   type="button"
                   onClick={() => setSessions([])}
-                  className="rounded-[12px] px-4 py-3 text-[14px] font-semibold"
-                  style={{ border: "1px solid #D1D5DB", color: "#374151", background: "#FFFFFF" }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    borderRadius: "10px",
+                    padding: "11px 18px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    border: "1px solid #D1D5DB",
+                    background: "#FFFFFF",
+                    color: "#374151",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
                 >
+                  <X size={14} />
                   Clear
                 </button>
-              ) : null}
+              )}
             </div>
           </form>
         </section>
 
-        <section className="mt-8 space-y-5">
-          {!hasResults ? (
-            <div className="rounded-[16px] bg-white px-6 py-8" style={{ border: "1px solid #E5E7EB" }}>
-              <div className="inline-flex items-center gap-2 text-[14px] font-semibold" style={{ color: "#374151" }}>
+        {/* ── Results ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {!hasResults && (
+            <div
+              style={{
+                background: "#FFFFFF",
+                borderRadius: "16px",
+                padding: "28px 24px",
+                border: "1px solid #E5E7EB",
+              }}
+            >
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 600, color: "#374151" }}>
                 <Sparkles size={15} />
                 Waiting for your first query
               </div>
-              <p className="mt-2 text-[15px]" style={{ color: "#6B7280" }}>
-                The legal advice response will appear here. Optional retrieval context is shown below each answer.
+              <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#6B7280" }}>
+                Your legal advice will appear here. Try one of the suggested prompts above or write your own.
               </p>
             </div>
-          ) : null}
+          )}
 
           {sessions.map((item, index) => (
-            <article key={item.id} className="rounded-[16px] bg-white p-6" style={{ border: "1px solid #E5E7EB" }}>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#6B7280" }}>
+            <article
+              key={item.id}
+              style={{
+                background: "#FFFFFF",
+                borderRadius: "16px",
+                padding: "24px",
+                border: "1px solid #E5E7EB",
+              }}
+            >
+              {/* Query label */}
+              <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6B7280" }}>
                 Query
               </p>
-              <p className="mt-2 text-[17px] leading-[1.65]" style={{ color: "#111827" }}>
+              <p style={{ margin: "6px 0 0", fontSize: "16px", lineHeight: 1.65, color: "#111827" }}>
                 {item.query}
               </p>
 
-              <div className="my-5 h-px" style={{ background: "#E5E7EB" }} />
+              {/* Divider */}
+              <div style={{ height: "1px", background: "#E5E7EB", margin: "18px 0" }} />
 
-              <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#374151" }}>
+              {/* Legal advice header */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#374151" }}>
                 <Scale size={14} />
                 Legal Advice
               </div>
 
-              <div className="mt-3 text-[16px] leading-[1.8]" style={{ color: "#374151" }}>
+              {/* Markdown answer */}
+              <div style={{ marginTop: "12px", fontSize: "15px", lineHeight: 1.8, color: "#374151" }}>
                 <ReactMarkdown
                   components={{
-                    h1: ({ ...props }) => <h2 className="mt-4 text-[24px] font-semibold" style={{ color: "#111827" }} {...props} />,
-                    h2: ({ ...props }) => <h3 className="mt-4 text-[21px] font-semibold" style={{ color: "#111827" }} {...props} />,
-                    h3: ({ ...props }) => <h4 className="mt-3 text-[18px] font-semibold" style={{ color: "#111827" }} {...props} />,
-                    p: ({ ...props }) => <p className="mt-2 text-[16px] leading-[1.85]" style={{ color: "#374151" }} {...props} />,
-                    li: ({ ...props }) => <li className="ml-5 list-disc text-[16px] leading-[1.8]" style={{ color: "#374151" }} {...props} />,
-                    strong: ({ ...props }) => <strong className="font-semibold" style={{ color: "#111827" }} {...props} />,
+                    h1: ({ ...props }) => (
+                      <h2 style={{ marginTop: "18px", marginBottom: "4px", fontSize: "22px", fontWeight: 700, color: "#111827" }} {...props} />
+                    ),
+                    h2: ({ ...props }) => (
+                      <h3 style={{ marginTop: "16px", marginBottom: "4px", fontSize: "19px", fontWeight: 700, color: "#111827" }} {...props} />
+                    ),
+                    h3: ({ ...props }) => (
+                      <h4 style={{ marginTop: "14px", marginBottom: "4px", fontSize: "16px", fontWeight: 700, color: "#111827" }} {...props} />
+                    ),
+                    p: ({ ...props }) => (
+                      <p style={{ margin: "8px 0 0", fontSize: "15px", lineHeight: 1.85, color: "#374151" }} {...props} />
+                    ),
+                    ul: ({ ...props }) => (
+                      <ul style={{ margin: "8px 0 0", paddingLeft: "20px" }} {...props} />
+                    ),
+                    ol: ({ ...props }) => (
+                      <ol style={{ margin: "8px 0 0", paddingLeft: "20px" }} {...props} />
+                    ),
+                    li: ({ ...props }) => (
+                      <li style={{ fontSize: "15px", lineHeight: 1.8, color: "#374151", marginBottom: "4px" }} {...props} />
+                    ),
+                    strong: ({ ...props }) => (
+                      <strong style={{ fontWeight: 700, color: "#111827" }} {...props} />
+                    ),
                   }}
                 >
                   {item.legalAdvice || "No legal advice returned by the service."}
                 </ReactMarkdown>
               </div>
 
-              <details className="mt-5 rounded-[12px] px-4 py-3" style={{ background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
-                <summary className="cursor-pointer text-[14px] font-semibold" style={{ color: "#374151" }}>
+              {/* Retrieval context (collapsible) */}
+              <details
+                style={{
+                  marginTop: "18px",
+                  borderRadius: "10px",
+                  padding: "12px 16px",
+                  background: "#F9FAFB",
+                  border: "1px solid #E5E7EB",
+                }}
+              >
+                <summary style={{ cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "#374151" }}>
                   Optional retrieval context
                 </summary>
 
-                <div className="mt-3 space-y-4">
+                <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Kanoon docs */}
                   <div>
-                    <p className="text-[13px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#6B7280" }}>
+                    <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6B7280" }}>
                       Kanoon docs
                     </p>
                     {item.kanoonDocuments.length === 0 ? (
-                      <p className="mt-1 text-[14px]" style={{ color: "#6B7280" }}>
-                        No docs returned.
-                      </p>
+                      <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#6B7280" }}>No docs returned.</p>
                     ) : (
-                      <ul className="mt-2 space-y-1">
-                        {item.kanoonDocuments.map((doc, docIndex) => (
-                          <li key={`${item.id}-doc-${docIndex}`} className="text-[14px]" style={{ color: "#374151" }}>
+                      <ul style={{ margin: "6px 0 0", paddingLeft: "16px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {item.kanoonDocuments.map((doc, i) => (
+                          <li key={`${item.id}-doc-${i}`} style={{ fontSize: "13px", color: "#374151" }}>
                             {typeof doc === "string" ? doc : JSON.stringify(doc)}
                           </li>
                         ))}
@@ -223,27 +347,27 @@ export default function LegalAssistantPage() {
                     )}
                   </div>
 
+                  {/* Vector matches */}
                   <div>
-                    <p className="text-[13px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#6B7280" }}>
+                    <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6B7280" }}>
                       Vector matches
                     </p>
                     {item.vectorMatches.length === 0 ? (
-                      <p className="mt-1 text-[14px]" style={{ color: "#6B7280" }}>
-                        No vector matches returned.
-                      </p>
+                      <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#6B7280" }}>No vector matches returned.</p>
                     ) : (
-                      <div className="mt-2 space-y-2">
-                        {item.vectorMatches.map((match, matchIndex) => (
-                          <div key={`${item.id}-vec-${matchIndex}`} className="rounded-[10px] bg-white px-3 py-3" style={{ border: "1px solid #E5E7EB" }}>
-                            <p className="text-[14px] leading-[1.7]" style={{ color: "#374151" }}>
+                      <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {item.vectorMatches.map((match, i) => (
+                          <div
+                            key={`${item.id}-vec-${i}`}
+                            style={{ borderRadius: "8px", background: "#FFFFFF", padding: "12px", border: "1px solid #E5E7EB" }}
+                          >
+                            <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.7, color: "#374151" }}>
                               {String(match?.content || "").slice(0, 320)}
-                              {String(match?.content || "").length > 320 ? "..." : ""}
+                              {String(match?.content || "").length > 320 ? "…" : ""}
                             </p>
-                            <p className="mt-1 text-[12px]" style={{ color: "#6B7280" }}>
+                            <p style={{ margin: "6px 0 0", fontSize: "11px", color: "#6B7280" }}>
                               Source: {match?.metadata?.source || "Unknown"}
-                              {Number.isFinite(Number(match?.score))
-                                ? ` | Score: ${Number(match.score).toFixed(3)}`
-                                : ""}
+                              {Number.isFinite(Number(match?.score)) ? ` · Score: ${Number(match.score).toFixed(3)}` : ""}
                             </p>
                           </div>
                         ))}
@@ -253,20 +377,19 @@ export default function LegalAssistantPage() {
                 </div>
               </details>
 
-              {index === 0 ? null : (
-                <p className="mt-4 text-[12px]" style={{ color: "#9CA3AF" }}>
-                  Previous query
-                </p>
+              {index > 0 && (
+                <p style={{ marginTop: "14px", fontSize: "11px", color: "#9CA3AF" }}>Previous query</p>
               )}
             </article>
           ))}
-        </section>
+        </div>
 
-        {latestSession ? (
-          <p className="mt-5 text-[12px] leading-[1.5]" style={{ color: "#9CA3AF" }}>
-            Disclaimer: This output is AI-generated legal information and not professional legal advice.
+        {/* Disclaimer */}
+        {latestSession && (
+          <p style={{ marginTop: "20px", fontSize: "12px", lineHeight: 1.6, color: "#9CA3AF" }}>
+            Disclaimer: This output is AI-generated legal information and not professional legal advice. Consult a qualified lawyer for your specific situation.
           </p>
-        ) : null}
+        )}
       </main>
     </div>
   );
