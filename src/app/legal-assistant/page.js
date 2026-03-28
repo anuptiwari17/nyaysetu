@@ -75,6 +75,7 @@ export default function LegalAssistantPage() {
 
       <main style={{ maxWidth: "860px", margin: "0 auto", padding: "88px 24px 64px" }}>
 
+        {/* ── Back button ── */}
         <div style={{ marginBottom: "16px" }}>
           <button
             type="button"
