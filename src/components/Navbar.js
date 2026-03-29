@@ -128,8 +128,8 @@ export default function Navbar() {
               <Link href="/login" className="btn-outline-sm">
                 Log in
               </Link>
-              <Link href="/grievances/new" className="btn-yellow-sm">
-                Report Issue
+              <Link href="/register" className="btn-yellow-sm">
+                Register
               </Link>
             </>
           )}
