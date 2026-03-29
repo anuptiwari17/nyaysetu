@@ -11,6 +11,7 @@ export default function Navbar() {
   const router = useRouter();
   const { user, isLoading, mutate } = useUser();
   const [scrolled, setScrolled] = useState(false);
+  const dashboardHref = user?.role === "authority" ? "/dashboard/authority" : "/dashboard/citizen";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -100,6 +101,24 @@ export default function Navbar() {
           {isLoading ? null : user ? (
             <>
               <span style={{ fontSize: 13, color: "#4A5568" }}>{user.name}</span>
+              <Link
+                href={dashboardHref}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "999px",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  border: "1px solid #D1D5DB",
+                  background: "#FFFFFF",
+                  color: "#1F2937",
+                  textDecoration: "none",
+                }}
+              >
+                Dashboard
+              </Link>
               <button type="button" className="btn-outline-sm" onClick={handleLogout}>
                 Logout
               </button>

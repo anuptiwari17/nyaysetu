@@ -24,6 +24,8 @@ export default function PetitionDetailPage() {
   const [hasSigned, setHasSigned] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [signError, setSignError] = useState("");
+  const [signQuota, setSignQuota] = useState(null);
   const [signersLoading, setSignersLoading] = useState(false);
   const [signersError, setSignersError] = useState("");
   const [signers, setSigners] = useState([]);
@@ -125,11 +127,16 @@ export default function PetitionDetailPage() {
     if (!userLoading && !user) { router.push("/login"); return; }
     if (!petitionId || hasSigned || isClosed) return;
     setSigning(true);
+    setSignError("");
     try {
       const res = await fetch(`/api/petitions/${petitionId}/sign`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.message || "Unable to sign petition");
+      if (!res.ok) {
+        if (json?.signQuota) setSignQuota(json.signQuota);
+        throw new Error(json?.message || "Unable to sign petition");
+      }
       setHasSigned(true);
+      if (json?.signQuota) setSignQuota(json.signQuota);
       setPetition((prev) => prev ? { ...prev, signatureCount: Number(prev.signatureCount || signatureCount) + 1 } : prev);
       if (canManagePetition) {
         setSigners((prev) => {
@@ -137,8 +144,12 @@ export default function PetitionDetailPage() {
           return [{ id: currentUserId, name: user?.name || "You", city: user?.city || "N/A", state: user?.state || "N/A", signedAt: new Date().toISOString() }, ...prev];
         });
       }
-    } catch {
-      if (!user) router.push("/login");
+    } catch (err) {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setSignError(err?.message || "Unable to sign petition");
     } finally {
       setSigning(false);
     }
@@ -362,6 +373,8 @@ export default function PetitionDetailPage() {
     downloadShareVisual(petition?.title, locationLabel, signatureCount, currentPageUrl);
   }
 
+  const hasReachedSignLimit = Number(signQuota?.remainingToday) === 0;
+
   return (
     <div style={{ minHeight: "100vh", background: "#F8F7F4", fontFamily: "'DM Sans', sans-serif" }}>
       <Navbar />
@@ -496,7 +509,7 @@ export default function PetitionDetailPage() {
             <button
               type="button"
               onClick={handleSign}
-              disabled={hasSigned || signing || isClosed}
+              disabled={hasSigned || signing || isClosed || hasReachedSignLimit}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -508,20 +521,40 @@ export default function PetitionDetailPage() {
                 fontSize: 15,
                 fontWeight: 700,
                 border: "none",
-                cursor: hasSigned || isClosed ? "default" : "pointer",
+                cursor: hasSigned || isClosed || hasReachedSignLimit ? "default" : "pointer",
                 fontFamily: "inherit",
                 transition: "background 0.15s, transform 0.1s",
                 ...(isClosed
                   ? { background: "#F1F5F9", color: "#A8A29E" }
-                  : hasSigned
+                  : hasReachedSignLimit
+                    ? { background: "#F8FAFC", color: "#94A3B8" }
+                    : hasSigned
                     ? { background: "#DCFCE7", color: "#16A34A" }
                     : { background: "#F5C842", color: "#0D1B2A" }),
               }}
-              onMouseEnter={(e) => { if (!hasSigned && !isClosed) e.currentTarget.style.background = "#EAB800"; }}
-              onMouseLeave={(e) => { if (!hasSigned && !isClosed) e.currentTarget.style.background = "#F5C842"; }}
+              onMouseEnter={(e) => { if (!hasSigned && !isClosed && !hasReachedSignLimit) e.currentTarget.style.background = "#EAB800"; }}
+              onMouseLeave={(e) => { if (!hasSigned && !isClosed && !hasReachedSignLimit) e.currentTarget.style.background = "#F5C842"; }}
             >
-              {signing ? "Signing…" : isClosed ? "Petition closed" : hasSigned ? "✓ Signed" : "Sign this Petition"}
+              {signing ? "Signing…" : isClosed ? "Petition closed" : hasReachedSignLimit ? "Daily sign limit reached" : hasSigned ? "✓ Signed" : "Sign this Petition"}
             </button>
+
+            <div style={{ marginTop: 10, borderRadius: 10, border: "1px solid #E2E8F0", background: "#F8FAFC", padding: "10px 12px" }}>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#64748B" }}>
+                Signing quota
+              </p>
+              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#475569" }}>
+                You can sign up to 5 petitions per day.
+                {signQuota
+                  ? ` Today: ${Number(signQuota?.petitionsSignedTodayCount || 0)}/${Number(signQuota?.dailyLimit || 5)} · Remaining: ${Math.max(0, Number(signQuota?.remainingToday || 0))}`
+                  : ""}
+              </p>
+            </div>
+
+            {signError && (
+              <p style={{ margin: "8px 0 0", fontSize: 13, color: "#B91C1C" }}>
+                {signError}
+              </p>
+            )}
 
             <button
               type="button"

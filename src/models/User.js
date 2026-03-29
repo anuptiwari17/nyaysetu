@@ -18,6 +18,8 @@ const UserSchema = new Schema(
     lastPetitionCreatedAt: { type: Date, default: null },
     petitionsTodayCount: { type: Number, default: 0 },
     lastPetitionDay: { type: String, default: "" },
+    petitionsSignedTodayCount: { type: Number, default: 0 },
+    lastPetitionSignDay: { type: String, default: "" },
   },
   { timestamps: true }
 );
