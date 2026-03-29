@@ -14,6 +14,45 @@ const SUGGESTED_PROMPTS = [
   "Police are not registering my complaint. What are legal options?",
 ];
 
+function extractCitationLines(text) {
+  const input = String(text || "");
+  if (!input.trim()) return [];
+
+  const citationRegex = /(section\s+\d+|article\s+\d+|\bipc\b|\bcrpc\b|\bcpc\b|constitution|act\b|\bv\.?\b|\bvs\.?\b|supreme court|high court)/i;
+  const lines = input
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^[-*\d.)\s]+/, ""))
+    .filter(Boolean)
+    .filter((line) => citationRegex.test(line));
+
+  return [...new Set(lines)].slice(0, 8);
+}
+
+function stringifyDocReference(doc) {
+  if (typeof doc === "string") return doc;
+  if (!doc || typeof doc !== "object") return "";
+
+  const pieces = [
+    doc.title,
+    doc.case_name,
+    doc.citation,
+    doc.section,
+    doc.act,
+    doc.url,
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+
+  if (pieces.length > 0) return pieces.join(" | ");
+  return JSON.stringify(doc);
+}
+
+function getVectorSource(match) {
+  const source = String(match?.metadata?.source || "").trim();
+  if (source) return source;
+  return "Unknown legal source";
+}
+
 export default function LegalAssistantPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -264,6 +303,68 @@ export default function LegalAssistantPage() {
                 border: "1px solid #E5E7EB",
               }}
             >
+              {(() => {
+                const extracted = extractCitationLines(item.legalAdvice);
+                const docs = item.kanoonDocuments.map(stringifyDocReference).filter(Boolean).slice(0, 5);
+                const matchSources = item.vectorMatches.map(getVectorSource).filter(Boolean).slice(0, 5);
+                const citationCount = extracted.length + docs.length + matchSources.length;
+
+                return citationCount > 0 ? (
+                  <section
+                    style={{
+                      marginBottom: "14px",
+                      borderRadius: "12px",
+                      border: "1px solid #DCCB95",
+                      background: "#FFFBEB",
+                      padding: "12px 14px",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#854D0E" }}>
+                      Citation Spotlight
+                    </p>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#78350F", lineHeight: 1.6 }}>
+                      Referenced laws/cases are highlighted below for quick legal grounding.
+                    </p>
+
+                    {extracted.length > 0 && (
+                      <ul style={{ margin: "8px 0 0", paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {extracted.map((line, i) => (
+                          <li key={`${item.id}-cit-${i}`} style={{ fontSize: "13px", color: "#78350F", lineHeight: 1.6 }}>
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {docs.length > 0 && (
+                      <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {docs.map((docText, i) => (
+                          <span
+                            key={`${item.id}-doc-chip-${i}`}
+                            style={{
+                              borderRadius: "999px",
+                              border: "1px solid #E7D29A",
+                              background: "#FFFFFF",
+                              color: "#7C2D12",
+                              fontSize: "12px",
+                              padding: "5px 10px",
+                            }}
+                          >
+                            {docText}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {matchSources.length > 0 && (
+                      <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#92400E", lineHeight: 1.6 }}>
+                        Sources: {matchSources.join(" · ")}
+                      </p>
+                    )}
+                  </section>
+                ) : null;
+              })()}
+
               {/* Query label */}
               <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6B7280" }}>
                 Query

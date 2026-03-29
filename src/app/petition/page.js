@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -241,6 +243,7 @@ export default function PetitionsPage() {
               const linkedIssueTitle =
                 (typeof petition?.issueId === "object" ? petition?.issueId?.title : "") || "";
               const sigs = sigCount(petition);
+              const tags = Array.isArray(petition?.tags) ? petition.tags.slice(0, 4) : [];
 
               return (
                 <article
@@ -264,6 +267,24 @@ export default function PetitionsPage() {
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
+                  <div
+                    style={{
+                      height: "170px",
+                      borderRadius: "10px",
+                      background: "#F3F4F6",
+                      overflow: "hidden",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    {petition?.thumbnailUrl ? (
+                      <img
+                        src={petition.thumbnailUrl}
+                        alt={petition?.title || "Petition thumbnail"}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      />
+                    ) : null}
+                  </div>
+
                   {/* Top row: badge + date */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                     <span
@@ -317,6 +338,33 @@ export default function PetitionsPage() {
                   >
                     {petition?.description || "No description available."}
                   </p>
+
+                  {tags.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px" }}>
+                      {tags.map((tag) => (
+                        <span
+                          key={`${id}-${tag}`}
+                          style={{
+                            borderRadius: "999px",
+                            padding: "4px 10px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: "#4A6FA9",
+                            background: "#EEF2FF",
+                            border: "1px solid #D5DEFA",
+                          }}
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {(petition?.city || petition?.location) && (
+                    <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#666666" }}>
+                      {[petition?.city, petition?.location].filter(Boolean).join(" | ")}
+                    </p>
+                  )}
 
                   {/* Linked issue label */}
                   {linkedIssueTitle && (

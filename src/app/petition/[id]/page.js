@@ -1,9 +1,11 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Trophy, Trash2, PenLine } from "lucide-react";
+import { Copy, Download, ExternalLink, PenLine, Share2, Trophy, Trash2, X } from "lucide-react";
 
 import Navbar from "@/components/Navbar";
 import { useUser } from "@/lib/useUser";
@@ -25,6 +27,15 @@ export default function PetitionDetailPage() {
   const [signersLoading, setSignersLoading] = useState(false);
   const [signersError, setSignersError] = useState("");
   const [signers, setSigners] = useState([]);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [activePlatform, setActivePlatform] = useState("x");
+  const [shareToast, setShareToast] = useState("");
+  const [pageUrl, setPageUrl] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setPageUrl(window.location.href);
+  }, []);
 
   useEffect(() => {
     if (!petitionId) return;
@@ -72,7 +83,7 @@ export default function PetitionDetailPage() {
     return Array.isArray(petition?.signatures) ? petition.signatures.length : 0;
   }, [petition]);
 
-  const progressWidth = Math.max(0, Math.min(100, Math.round((signatureCount / 100) * 100)));
+  const progressWidth = Math.round((signatureCount / 100) * 100);
   const petitionStatus = String(petition?.status || "active");
   const isClosed = petitionStatus === "victory_declared";
   const petitionCreatorId = String(
@@ -186,6 +197,95 @@ export default function PetitionDetailPage() {
     URL.revokeObjectURL(url);
   }
 
+  function showToast(message) {
+    setShareToast(message);
+    window.setTimeout(() => {
+      setShareToast("");
+    }, 1800);
+  }
+
+  async function copyToClipboard(value, successMessage) {
+    try {
+      await navigator.clipboard.writeText(value);
+      showToast(successMessage);
+      return true;
+    } catch {
+      showToast("Could not copy. Try again.");
+      return false;
+    }
+  }
+
+  function formatShareText(platform, url, title, locationLabel, count) {
+    const safeTitle = title || "Support this public petition";
+    const place = locationLabel ? ` in ${locationLabel}` : "";
+
+    if (platform === "x") {
+      return `${safeTitle}${place}. ${count} supporters so far. Join and sign: ${url} #NyaySetu #CivicAction`;
+    }
+
+    if (platform === "whatsapp") {
+      return `Hi, please support this petition: ${safeTitle}${place}. Already ${count} people signed. Sign here: ${url}`;
+    }
+
+    if (platform === "linkedin") {
+      return `Civic participation matters. ${safeTitle}${place} already has ${count} supporters. Please review and support: ${url}`;
+    }
+
+    return `Raise your voice for change. ${safeTitle}${place}. ${count} supporters and growing. Link in bio/story: ${url} #petition #community`;
+  }
+
+  function buildShareUrl(platform, text, url) {
+    if (platform === "x") {
+      return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    }
+
+    if (platform === "whatsapp") {
+      return `https://wa.me/?text=${encodeURIComponent(text)}`;
+    }
+
+    if (platform === "linkedin") {
+      return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+    }
+
+    return "https://www.instagram.com/";
+  }
+
+  function downloadShareVisual(title, locationLabel, count, url) {
+    const safeTitle = String(title || "Support this Petition").slice(0, 140);
+    const safeLocation = String(locationLabel || "Public Civic Action").slice(0, 70);
+    const safeUrl = String(url || "").slice(0, 120);
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#g)" />
+  <text x="80" y="150" fill="#BFDBFE" font-family="Arial, sans-serif" font-size="34" font-weight="700">NYAYSETU PETITION</text>
+  <text x="80" y="255" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="62" font-weight="700">${safeTitle.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>
+  <text x="80" y="360" fill="#DBEAFE" font-family="Arial, sans-serif" font-size="34">${safeLocation.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>
+  <rect x="80" y="430" width="920" height="2" fill="#60A5FA" opacity="0.4" />
+  <text x="80" y="520" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="110" font-weight="700">${count}</text>
+  <text x="80" y="580" fill="#DBEAFE" font-family="Arial, sans-serif" font-size="36">supporters already signed</text>
+  <text x="80" y="740" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="42" font-weight="700">Sign and share this petition</text>
+  <rect x="80" y="790" width="920" height="120" rx="20" fill="#1E3A8A" opacity="0.85" />
+  <text x="100" y="865" fill="#BFDBFE" font-family="Arial, sans-serif" font-size="30">${safeUrl.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>
+</svg>`;
+
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.setAttribute("download", `petition-share-${petitionId}.svg`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+    showToast("Visual downloaded");
+  }
+
   // ── Loading state ──
   if (loading) {
     return (
@@ -220,6 +320,47 @@ export default function PetitionDetailPage() {
   const linkedIssueTitle =
     (typeof petition?.issueId === "object" ? petition?.issueId?.title : "") ||
     petition?.grievanceTitle || petition?.issueTitle || "";
+  const tags = Array.isArray(petition?.tags) ? petition.tags : [];
+  const currentPageUrl = pageUrl || `https://nyaysetu.app/petition/${petitionId}`;
+  const locationLabel = [petition?.city, petition?.location].filter(Boolean).join(", ");
+  const sharePlatforms = [
+    { key: "x", label: "X" },
+    { key: "whatsapp", label: "WhatsApp" },
+    { key: "linkedin", label: "LinkedIn" },
+    { key: "instagram", label: "Instagram" },
+  ];
+  const activeShareText = formatShareText(activePlatform, currentPageUrl, petition?.title, locationLabel, signatureCount);
+  const activeShareUrl = buildShareUrl(activePlatform, activeShareText, currentPageUrl);
+
+  async function handleShareNow() {
+    if (activePlatform === "instagram" && navigator.share) {
+      try {
+        await navigator.share({ title: petition?.title || "Petition", text: activeShareText, url: currentPageUrl });
+        showToast("Shared via app sheet");
+      } catch {
+        // ignore cancellation
+      }
+      return;
+    }
+
+    if (activePlatform === "instagram") {
+      await copyToClipboard(activeShareText, "Caption copied for Instagram");
+    }
+
+    window.open(activeShareUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleCopyText() {
+    await copyToClipboard(activeShareText, "Share text copied");
+  }
+
+  async function handleCopyLink() {
+    await copyToClipboard(currentPageUrl, "Petition link copied");
+  }
+
+  function handleDownloadVisual() {
+    downloadShareVisual(petition?.title, locationLabel, signatureCount, currentPageUrl);
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#F8F7F4", fontFamily: "'DM Sans', sans-serif" }}>
@@ -263,6 +404,46 @@ export default function PetitionDetailPage() {
             {petition?.title || "Untitled petition"}
           </h1>
 
+          {petition?.thumbnailUrl && (
+            <div style={{ marginBottom: 16, borderRadius: 14, overflow: "hidden", border: "1px solid #EDE8DF", background: "#F8FAFC" }}>
+              <img
+                src={petition.thumbnailUrl}
+                alt={petition?.title || "Petition thumbnail"}
+                style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }}
+              />
+            </div>
+          )}
+
+          {(tags.length > 0 || petition?.city || petition?.location) && (
+            <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              {tags.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {tags.map((tag) => (
+                    <span
+                      key={`${petitionId}-${tag}`}
+                      style={{
+                        borderRadius: "999px",
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: "#EEF2FF",
+                        color: "#4A6FA9",
+                        border: "1px solid #D5DEFA",
+                      }}
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {(petition?.city || petition?.location) && (
+                <p style={{ margin: 0, fontSize: 13, color: "#78716C" }}>
+                  {[petition?.city, petition?.location].filter(Boolean).join(" | ")}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Linked issue */}
           {(linkedIssueId || linkedIssueTitle) && (
             <div style={{ marginBottom: 18, borderRadius: 12, background: "#FAFAF8", padding: "12px 14px", border: "1px solid #EDE8DF" }}>
@@ -293,22 +474,22 @@ export default function PetitionDetailPage() {
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
               <p style={{ margin: 0, fontFamily: "Fraunces, Georgia, serif", fontSize: 26, fontWeight: 800, color: "#0D1B2A" }}>
                 {signatureCount}
-                <span style={{ fontSize: 15, fontWeight: 500, color: "#A8A29E", marginLeft: 6 }}>of 100 signatures</span>
+                <span style={{ fontSize: 15, fontWeight: 500, color: "#A8A29E", marginLeft: 6 }}>supporters</span>
               </p>
-              <span style={{ fontSize: 13, fontWeight: 700, color: progressWidth >= 100 ? "#16A34A" : "#78716C" }}>
-                {progressWidth}%
-              </span>
             </div>
 
             {/* Progress bar */}
-            <div style={{ height: 8, borderRadius: 4, background: "#EDE8DF", overflow: "hidden", marginBottom: 14 }}>
+            <div style={{ height: 8, borderRadius: 4, background: "#EDE8DF", overflow: "visible", marginBottom: 14 }}>
               <div style={{
                 height: "100%",
                 borderRadius: 4,
-                background: progressWidth >= 100 ? "#16A34A" : "#4A6FA9",
-                width: `${progressWidth}%`,
+                background: "#4A6FA9",
+                width: `${Math.min(progressWidth, 100)}%`,
                 transition: "width 0.4s ease",
               }} />
+              {progressWidth > 100 && (
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#16A34A", marginTop: 4 }}>Goal exceeded! {signatureCount}+ supporters</div>
+              )}
             </div>
 
             {/* Sign button */}
@@ -342,11 +523,158 @@ export default function PetitionDetailPage() {
               {signing ? "Signing…" : isClosed ? "Petition closed" : hasSigned ? "✓ Signed" : "Sign this Petition"}
             </button>
 
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              style={{
+                marginTop: 10,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                width: "100%",
+                padding: "11px 0",
+                borderRadius: 50,
+                fontSize: 14,
+                fontWeight: 700,
+                border: "1px solid #C7D2F0",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                background: "#EEF2FF",
+                color: "#1E3A8A",
+              }}
+            >
+              <Share2 size={15} />
+              Share Petition
+            </button>
+
             <p style={{ margin: "9px 0 0", fontSize: 13, color: "#A8A29E", textAlign: "center" }}>
-              {signatureCount} {signatureCount === 1 ? "citizen has" : "citizens have"} signed this petition
+              {signatureCount} {signatureCount === 1 ? "person has" : "people have"} signed this petition
             </p>
           </div>
         </article>
+
+        {showShareModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(15, 23, 42, 0.45)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 60,
+              padding: "20px",
+            }}
+            onClick={() => setShowShareModal(false)}
+          >
+            <div
+              style={{
+                width: "min(760px, 100%)",
+                maxHeight: "90vh",
+                overflowY: "auto",
+                background: "#FFFFFF",
+                borderRadius: 16,
+                border: "1px solid #EDE8DF",
+                padding: "18px",
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0D1B2A" }}>Share Petition</p>
+                  <p style={{ margin: "3px 0 0", fontSize: 13, color: "#78716C" }}>Choose platform and share in one click.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(false)}
+                  style={{
+                    border: "1px solid #E5E7EB",
+                    background: "#FFFFFF",
+                    color: "#64748B",
+                    borderRadius: 999,
+                    width: 34,
+                    height: 34,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                {sharePlatforms.map((platform) => (
+                  <button
+                    key={platform.key}
+                    type="button"
+                    onClick={() => setActivePlatform(platform.key)}
+                    style={{
+                      borderRadius: 999,
+                      border: activePlatform === platform.key ? "none" : "1px solid #E5E7EB",
+                      background: activePlatform === platform.key ? "#1D4ED8" : "#FFFFFF",
+                      color: activePlatform === platform.key ? "#FFFFFF" : "#334155",
+                      padding: "8px 14px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {platform.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ border: "1px solid #EDE8DF", borderRadius: 12, padding: 14, background: "#F8FAFC", marginBottom: 14 }}>
+                <p style={{ margin: "0 0 7px", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748B" }}>
+                  Live Preview
+                </p>
+                <p style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.7, color: "#0F172A" }}>
+                  {activeShareText}
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={handleShareNow}
+                  style={{ borderRadius: 10, border: "none", background: "#1D4ED8", color: "#FFFFFF", padding: "11px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: 7 }}
+                >
+                  <ExternalLink size={15} />
+                  Share Now
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyText}
+                  style={{ borderRadius: 10, border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#334155", padding: "11px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: 7 }}
+                >
+                  <Copy size={15} />
+                  Copy Text
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  style={{ borderRadius: 10, border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#334155", padding: "11px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: 7 }}
+                >
+                  <Copy size={15} />
+                  Copy Link
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadVisual}
+                  style={{ borderRadius: 10, border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#334155", padding: "11px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: 7 }}
+                >
+                  <Download size={15} />
+                  Download Visual
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Creator controls ── */}
         {canManagePetition && (
@@ -460,6 +788,26 @@ export default function PetitionDetailPage() {
           </section>
         )}
       </main>
+
+      {shareToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#0F172A",
+            color: "#FFFFFF",
+            padding: "9px 14px",
+            borderRadius: 999,
+            fontSize: 13,
+            fontWeight: 600,
+            zIndex: 70,
+          }}
+        >
+          {shareToast}
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }

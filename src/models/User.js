@@ -15,6 +15,9 @@ const UserSchema = new Schema(
     authorityName: { type: String, default: "", trim: true },
     isEmailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
+    lastPetitionCreatedAt: { type: Date, default: null },
+    petitionsTodayCount: { type: Number, default: 0 },
+    lastPetitionDay: { type: String, default: "" },
   },
   { timestamps: true }
 );

@@ -47,6 +47,12 @@ export async function POST(request) {
     }
 
     const endpoint = `${baseUrl.replace(/\/+$/, "")}/kanoon`;
+    const enhancedQuery = [
+      query,
+      "",
+      "Please include relevant Indian legal citations (sections, articles, act names, and case references where applicable) while keeping the practical guidance complete.",
+      "Do not omit steps, remedies, or process details.",
+    ].join("\n");
 
     const upstreamResponse = await fetch(endpoint, {
       method: "POST",
@@ -54,7 +60,7 @@ export async function POST(request) {
         accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query: enhancedQuery }),
       cache: "no-store",
     });
 
